@@ -4,3 +4,9 @@
 
 [functions]
   node_bundler = "esbuild"
+
+# Image generation can take a while. Raise the timeout as high as your Netlify
+# plan allows (26s on most paid plans). If your plan caps at 10s, set
+# OPENAI_IMAGE_QUALITY=low so single images finish inside the window.
+[functions."generate-image"]
+  # (Netlify enforces the real ceiling per plan; this documents intent.)
