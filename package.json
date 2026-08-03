@@ -1,0 +1,9 @@
+{
+  "name": "ve-copilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VE Copilot — turns a prospect's plain-English app idea into a clickable prototype, an instant estimate, a build-ready spec, and a captured, sales-ready lead.",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VE Copilot — Idea to build-ready plan in minutes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F2EB; --paper:#FFFFFF; --ink:#17130B; --body:#4B463B; --muted:#6E675A;
+  --coral:#FF5A36; --butter:#FFD649; --mint:#B9EFD9; --mint-deep:#0E8A66; --teal:#0EA5A4;
+  --line:rgba(23,19,11,.12); --line-2:rgba(23,19,11,.22);
+  --ink-60:rgba(23,19,11,.6); --ink-40:rgba(23,19,11,.4);
+  --r:22px; --shadow:0 1px 2px rgba(23,19,11,.04), 0 12px 32px -20px rgba(23,19,11,.20);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.6; -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.045;z-index:0;
+  background-image:radial-gradient(rgba(23,19,11,.9) .6px,transparent .6px);background-size:3.4px 3.4px}
+h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:-.02em;line-height:1.1;}
+a{color:inherit;text-decoration:none;}
+button{font-family:'Inter',sans-serif;cursor:pointer;border:none;background:none;}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--coral);}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(18px,4vw,40px);position:relative;z-index:1;}
+
+/* ---------- header ---------- */
+header.top{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:20;}
+.top-inner{display:flex;align-items:center;justify-content:space-between;padding:16px 0;}
+.brand{font-weight:700;font-size:19px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--coral);}
+.brand small{font-weight:600;font-size:12px;color:var(--ink-60);font-family:'Inter';margin-left:2px;}
+.top-cta{font-size:13px;font-weight:700;padding:10px 18px;border-radius:100px;background:var(--ink);color:var(--bg);}
+
+/* ---------- hero / input ---------- */
+.hero{padding:clamp(40px,7vw,84px) 0 40px;text-align:center;}
+.hero .eyebrow{margin-bottom:14px;display:inline-block;}
+.hero h1{font-size:clamp(32px,5.4vw,56px);letter-spacing:-.03em;max-width:14ch;margin:0 auto 18px;}
+.hero h1 .hl{background:linear-gradient(var(--butter),var(--butter)) no-repeat 0 82%/100% 38%;padding:0 .05em;}
+.hero p.sub{font-size:clamp(15px,1.6vw,18px);color:var(--muted);max-width:56ch;margin:0 auto 34px;}
+.composer{max-width:660px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:8px;text-align:left;}
+.composer textarea{width:100%;border:none;outline:none;resize:none;font-family:'Inter';font-size:16px;
+  color:var(--ink);padding:16px 16px 8px;background:transparent;line-height:1.5;min-height:82px;}
+.composer textarea::placeholder{color:var(--ink-40);}
+.composer-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 8px;gap:12px;}
+.composer-hint{font-size:12.5px;color:var(--ink-40);}
+.btn-primary{background:var(--coral);color:#fff;font-weight:700;font-size:15px;padding:13px 24px;border-radius:100px;
+  display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 10px -2px rgba(255,90,54,.5);transition:transform .15s,filter .15s;}
+.btn-primary:hover{filter:brightness(1.05);transform:translateY(-1px);}
+.btn-primary:disabled{opacity:.5;cursor:default;transform:none;filter:none;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:22px;}
+.chip{font-size:13px;font-weight:600;color:var(--body);background:var(--paper);border:1px solid var(--line);
+  padding:8px 15px;border-radius:100px;transition:border-color .15s,color .15s;}
+.chip:hover{border-color:var(--ink);color:var(--ink);}
+
+/* ---------- steps rail ---------- */
+.rail{display:flex;gap:6px;justify-content:center;margin:34px auto 0;flex-wrap:wrap;}
+.rail .node{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink-40);}
+.rail .node .b{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-2);display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-family:'Space Grotesk';}
+.rail .node.on{color:var(--ink);}
+.rail .node.on .b{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+.rail .node.done .b{background:var(--mint-deep);color:#fff;border-color:var(--mint-deep);}
+.rail .sep{width:26px;height:1.5px;background:var(--line-2);align-self:center;}
+
+/* ---------- workspace ---------- */
+.workspace{display:none;padding:36px 0 90px;}
+.workspace.show{display:block;}
+.ws-grid{display:grid;grid-template-columns:340px 1fr;gap:40px;align-items:start;}
+@media(max-width:900px){.ws-grid{grid-template-columns:1fr;gap:32px;}}
+
+/* phone (reused from the studio renderer) */
+.phone-col{position:sticky;top:96px;}
+@media(max-width:900px){.phone-col{position:static;display:flex;justify-content:center;}}
+.phone-shell{position:relative;background:linear-gradient(145deg,#3a3a3c,#1c1c1e 40%,#2c2c2e);
+  border-radius:54px;padding:8px;width:320px;margin:0 auto;
+  box-shadow:0 24px 56px -20px rgba(23,19,11,.35),0 4px 14px -4px rgba(23,19,11,.2),inset 0 0 0 1px rgba(255,255,255,.06);}
+.phone-screen{background:var(--paper);border-radius:46px;overflow:hidden;height:640px;position:relative;
+  display:flex;flex-direction:column;box-shadow:inset 0 0 0 2px rgba(0,0,0,.9);}
+.phone-island{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:96px;height:28px;background:#000;border-radius:20px;z-index:20;}
+.app-frame{flex:1;overflow-y:auto;overflow-x:hidden;padding-top:44px;}
+.app-frame::-webkit-scrollbar{display:none;}
+.nav-controls{display:flex;justify-content:center;gap:8px;margin-top:14px;}
+.nav-controls button{border:1px solid var(--line);background:var(--paper);border-radius:100px;padding:8px 14px;
+  font-size:12px;font-weight:700;color:var(--ink-60);}
+.nav-controls button:hover:not(:disabled){color:var(--ink);border-color:var(--ink);}
+.nav-controls button:disabled{opacity:.35;cursor:default;}
+.proto-name{text-align:center;font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:12px;}
+
+/* panels */
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
+  padding:22px 22px 24px;margin-bottom:20px;}
+.panel.locked{opacity:.5;pointer-events:none;filter:saturate(.4);}
+.panel h3{font-size:17px;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.panel .step-tag{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--coral);margin-bottom:10px;}
+.panel p.lede{font-size:13.5px;color:var(--muted);margin-bottom:16px;}
+.field-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 8px;}
+select,input[type=text],input[type=email]{width:100%;font-family:'Inter';font-size:14px;padding:12px 14px;border-radius:12px;
+  border:1px solid var(--line);background:#FbFaf6;color:var(--ink);outline:none;}
+select:focus,input:focus{border-color:var(--ink);}
+.toggle-row{display:flex;gap:8px;flex-wrap:wrap;}
+.toggle{font-size:13px;font-weight:600;padding:9px 15px;border-radius:100px;border:1.5px solid var(--line);color:var(--body);background:#FbFaf6;}
+.toggle.on{border-color:var(--ink);background:var(--ink);color:var(--bg);}
+.checks{display:flex;flex-direction:column;gap:2px;margin-top:6px;max-height:230px;overflow:auto;}
+.check{display:flex;align-items:center;gap:10px;padding:9px 4px;font-size:13.5px;cursor:pointer;border-bottom:1px solid rgba(23,19,11,.05);}
+.check .box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line-2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;}
+.check.on .box{background:var(--coral);border-color:var(--coral);}
+.check .tag-ai{font-size:9.5px;font-weight:800;letter-spacing:.05em;color:var(--teal);border:1px solid var(--teal);border-radius:5px;padding:1px 5px;margin-left:auto;}
+
+/* estimate card */
+.est{background:var(--ink);color:var(--bg);border-radius:18px;padding:22px;margin-top:4px;}
+.est .big{font-family:'Space Grotesk';font-weight:700;font-size:38px;letter-spacing:-.02em;line-height:1;}
+.est .big small{font-size:15px;font-weight:600;color:rgba(244,242,235,.6);}
+.est .row{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid rgba(244,242,235,.14);}
+.est .row:last-child{border-bottom:none;}
+.est .row span:first-child{color:rgba(244,242,235,.6);}
+.est .pkg{margin-top:14px;background:rgba(244,242,235,.08);border-radius:12px;padding:14px;}
+.est .pkg .n{font-weight:700;font-size:14px;}
+.est .pkg .b{font-size:12px;color:rgba(244,242,235,.7);margin-top:4px;}
+
+.btn-block{width:100%;justify-content:center;margin-top:16px;}
+.btn-ghost{width:100%;justify-content:center;background:transparent;border:1.5px solid var(--ink);color:var(--ink);
+  font-weight:700;padding:12px;border-radius:100px;display:inline-flex;align-items:center;gap:8px;margin-top:12px;}
+.btn-ghost:hover{background:var(--ink);color:var(--bg);}
+
+/* spec */
+.spec-block{margin-top:8px;}
+.spec-block .g{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:18px 0 8px;}
+.spec-summary{font-size:14.5px;color:var(--body);background:#FbFaf6;border-left:3px solid var(--coral);padding:12px 14px;border-radius:0 10px 10px 0;}
+.pill{display:inline-block;font-size:12px;font-weight:600;background:var(--mint);color:var(--mint-deep);padding:4px 11px;border-radius:100px;margin:0 6px 6px 0;}
+.screen-card{border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;}
+.screen-card .h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+.screen-card .h .t{font-family:'Space Grotesk';font-weight:700;font-size:14.5px;}
+.screen-card .eff{font-size:10.5px;font-weight:800;color:#fff;background:var(--teal);border-radius:6px;padding:2px 8px;}
+.screen-card .eff.S{background:#7AA35B}.screen-card .eff.M{background:var(--teal)}.screen-card .eff.L{background:#D08A2E}.screen-card .eff.XL{background:var(--coral)}
+.screen-card .p{font-size:12.5px;color:var(--muted);margin:5px 0 8px;}
+.screen-card ul{list-style:none;}
+.screen-card li{font-size:12.5px;color:var(--body);padding-left:14px;position:relative;margin-bottom:3px;}
+.screen-card li::before{content:"›";position:absolute;left:0;color:var(--coral);font-weight:700;}
+.kv{font-size:12.5px;color:var(--body);padding:5px 0;border-bottom:1px solid rgba(23,19,11,.05);}
+.kv b{font-family:'Space Grotesk';}
+
+/* share / lead */
+.share-box{background:linear-gradient(135deg,#FFF3C4,#FFE49A);border-radius:16px;padding:18px;margin-top:14px;}
+.share-box .lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#9A6B00;margin-bottom:8px;}
+.share-link{display:flex;gap:8px;}
+.share-link input{background:#fff;border-color:rgba(23,19,11,.15);font-size:13px;}
+.share-link button{white-space:nowrap;font-weight:700;font-size:13px;padding:0 16px;border-radius:12px;background:var(--ink);color:var(--bg);}
+
+.msg{font-size:13px;padding:10px 14px;border-radius:10px;margin-top:12px;}
+.msg.err{background:#FDE7E0;color:#B03A1E;}
+.msg.ok{background:var(--mint);color:var(--mint-deep);}
+
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;display:inline-block;animation:sp .7s linear infinite;}
+.spin.dark{border-color:rgba(23,19,11,.25);border-top-color:var(--ink);}
+@keyframes sp{to{transform:rotate(360deg);}}
+.loading-inline{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted);padding:8px 0;}
+.hidden{display:none !important;}
+footer{border-top:1px solid var(--line);padding:26px 0;text-align:center;font-size:12.5px;color:var(--ink-40);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand"><span class="dot"></span>VirtualEmployee<small>Copilot</small></div>
+    <a class="top-cta" href="https://www.virtualemployee.com" target="_blank" rel="noopener">Talk to us →</a>
+  </div>
+</header>
+
+<!-- ============ HERO / INPUT ============ -->
+<section class="hero wrap" id="hero">
+  <span class="eyebrow">Idea → Prototype → Plan → Team</span>
+  <h1>Turn your app idea into a <span class="hl">build-ready plan</span> in minutes</h1>
+  <p class="sub">Describe your mobile app in plain English. Copilot builds a clickable prototype, prices it, and writes the engineering spec — then our team takes it from there.</p>
+
+  <div class="composer">
+    <textarea id="ideaInput" maxlength="2000" placeholder="e.g. A food delivery app with live order tracking, saved favorites, and in-app chat with the driver"></textarea>
+    <div class="composer-bar">
+      <span class="composer-hint">The more specific, the better the prototype.</span>
+      <button class="btn-primary" id="generateBtn" onclick="startGeneration()">Build my prototype <span id="genArrow">→</span></button>
+    </div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="rail" id="rail">
+    <div class="node" data-step="proto"><span class="b">1</span> Prototype</div>
+    <div class="sep"></div>
+    <div class="node" data-step="estimate"><span class="b">2</span> Estimate</div>
+    <div class="sep"></div>
+    <div class="node" data-step="plan"><span class="b">3</span> Build plan</div>
+    <div class="sep"></div>
+    <div class="node" data-step="team"><span class="b">4</span> Your team</div>
+  </div>
+</section>
+
+<!-- ============ WORKSPACE ============ -->
+<section class="workspace wrap" id="workspace">
+  <div class="ws-grid">
+    <!-- left: phone -->
+    <div class="phone-col">
+      <div class="proto-name" id="protoName">Your prototype</div>
+      <div class="phone-shell">
+        <div class="phone-screen">
+          <div class="phone-island"></div>
+          <div class="app-frame" id="appFrame"></div>
+        </div>
+      </div>
+      <div class="nav-controls">
+        <button id="navBack" onclick="navBack()">← Back</button>
+        <button onclick="navHome()">Home</button>
+        <button onclick="resetAll()">↺ New idea</button>
+      </div>
+    </div>
+
+    <!-- right: panels -->
+    <div class="panel-col">
+
+      <!-- STEP 2: estimate configurator -->
+      <div class="panel" id="panelEstimate">
+        <div class="step-tag">Step 2 — Instant estimate</div>
+        <h3>What are we building, exactly?</h3>
+        <p class="lede">Tune a few details and get a real cost and timeline — the same numbers our sales team quotes from.</p>
+
+        <div class="field-label">Category</div>
+        <select id="catSelect" onchange="renderFeatures()"></select>
+
+        <div class="field-label">Platform</div>
+        <div class="toggle-row" id="platformRow">
+          <button class="toggle on" data-plat="ios" onclick="togglePlat(this)">iOS</button>
+          <button class="toggle on" data-plat="android" onclick="togglePlat(this)">Android</button>
+        </div>
+
+        <div class="field-label">Scope</div>
+        <div class="toggle-row" id="scopeRow">
+          <button class="toggle on" data-size="mvp" onclick="selectSize(this)">MVP</button>
+          <button class="toggle" data-size="basic" onclick="selectSize(this)">Basic</button>
+          <button class="toggle" data-size="refined" onclick="selectSize(this)">Refined</button>
+        </div>
+
+        <div class="field-label">Features & AI capabilities</div>
+        <div class="checks" id="featureChecks"></div>
+
+        <button class="btn-primary btn-block" id="estimateBtn" onclick="runEstimate()">Calculate my estimate</button>
+        <div id="estimateOut"></div>
+      </div>
+
+      <!-- STEP 3+4: unlock plan (lead capture gate) -->
+      <div class="panel locked" id="panelPlan">
+        <div class="step-tag">Step 3 — Your build plan &amp; team</div>
+        <h3>Get the full engineering plan</h3>
+        <p class="lede">We'll generate a build-ready spec (screen-by-screen user stories, data model, API surface, effort per screen) and create a shareable deal room. Tell us where to send it.</p>
+
+        <div class="field-label">Your name</div>
+        <input type="text" id="leadName" placeholder="Jane Doe">
+        <div class="field-label">Work email</div>
+        <input type="email" id="leadEmail" placeholder="jane@company.com">
+        <div class="field-label">Company <span style="text-transform:none;font-weight:500;color:var(--ink-40)">(optional)</span></div>
+        <input type="text" id="leadCompany" placeholder="Acme Inc.">
+
+        <button class="btn-primary btn-block" id="planBtn" onclick="unlockPlan()">Generate my build plan →</button>
+        <div id="planMsg"></div>
+      </div>
+
+      <!-- spec output -->
+      <div class="panel hidden" id="panelSpec">
+        <div class="step-tag">Build-ready specification</div>
+        <h3 id="specTitle">Product spec</h3>
+        <div id="specOut"></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer class="wrap">Built by VirtualEmployee.com · Prototypes and estimates are directional and refined during discovery.</footer>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+const S = {
+  idea: "",
+  prototype: null,
+  catalog: null,
+  size: "mvp",
+  platform: ["ios", "android"],
+  selected: new Set(),
+  estimate: null,
+  spec: null,
+  dealId: null,
+  dealUrl: null,
+};
+
+const EXAMPLES = [
+  "A fitness app with workout plans and progress charts",
+  "A marketplace for renting furniture",
+  "A telemedicine app with video visits and prescriptions",
+  "A food delivery app with live order tracking",
+];
+
+// Rough keyword → category mapping so the configurator pre-selects the most
+// likely category from the user's idea. It's only a starting guess — the
+// user can change it.
+const CAT_HINTS = [
+  ["fitness", /fitness|workout|gym|exercise|health tracking|wellness|yoga/i],
+  ["dating", /dating|match|relationship|singles/i],
+  ["food", /food|grocery|delivery|restaurant|meal|takeout/i],
+  ["healthcare", /health|medical|doctor|telemed|patient|clinic|therapy/i],
+  ["ecommerce", /shop|store|ecommerce|marketplace|retail|product|sell/i],
+  ["education", /learn|course|education|school|student|tutor|study/i],
+  ["realestate", /real estate|property|rent|apartment|housing|listing/i],
+  ["ride", /ride|taxi|uber|mobility|driver|trip/i],
+  ["logistics", /logistics|fleet|shipping|delivery fleet|warehouse|courier/i],
+  ["fintech", /bank|finance|fintech|wallet|payment|invest|crypto|money/i],
+  ["booking", /book|appointment|reservation|schedule|salon|barber/i],
+  ["travel", /travel|hotel|flight|trip|tour|vacation|hospitality/i],
+  ["social", /social|community|feed|friends|network|forum/i],
+  ["streaming", /stream|video|music|podcast|watch|entertainment/i],
+  ["business", /business|productivity|workflow|team|enterprise|crm|dashboard/i],
+];
+
+function guessCategory(idea) {
+  for (const [key, re] of CAT_HINTS) if (re.test(idea)) return key;
+  return "custom";
+}
+
+// ============================================================
+// Prototype renderer — kept identical to the studio share page so a
+// prototype looks the same everywhere it's shown.
+// ============================================================
+function photoUrl(c, w, h){
+  if(c && c.resolved_image_url) return c.resolved_image_url;
+  const q = (c && c.image_query) || 'app';
+  const seed = encodeURIComponent(q.toLowerCase().replace(/\s+/g,'-'));
+  return `https://picsum.photos/seed/${seed}/${w}/${h}`;
+}
+const CARD_SHADOW='0 1px 2px rgba(23,19,11,.04), 0 4px 12px -6px rgba(23,19,11,.10)';
+const GUTTER=18, RADIUS_LG=16, RADIUS_MD=12;
+function componentHTML(c, accent){
+  switch(c.kind){
+    case 'header': return `<div style="font-family:'Space Grotesk';font-weight:700;font-size:20px;padding:4px 20px 14px;">${c.text||''}</div>`;
+    case 'text':
+      if(c.style==='heading') return `<div style="font-family:'Space Grotesk';font-weight:700;font-size:22px;padding:0 20px 10px;line-height:1.2;">${c.text||''}</div>`;
+      if(c.style==='caption') return `<div style="font-size:12px;color:#8a8578;padding:0 20px 8px;">${c.text||''}</div>`;
+      return `<div style="font-size:14px;line-height:1.5;padding:0 20px 12px;color:#3a352a;">${c.text||''}</div>`;
+    case 'card': return `<div class="gcard" data-nav="${c.navTo||''}" style="margin:0 ${GUTTER}px 12px;padding:12px;border-radius:${RADIUS_LG}px;background:#fff;box-shadow:${CARD_SHADOW};display:flex;gap:12px;align-items:center;cursor:${c.navTo?'pointer':'default'};">
+        <div style="width:56px;height:56px;border-radius:${RADIUS_MD}px;overflow:hidden;flex-shrink:0;background:#F0EEE6;"><img src="${photoUrl(c,112,112)}" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></div>
+        <div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14.5px;">${c.title||''}</div><div style="font-size:12.5px;color:#8a8578;margin-top:3px;font-weight:500;">${c.subtitle||''}</div></div>
+        ${c.navTo?`<div style="color:${accent};font-size:17px;font-weight:600;">›</div>`:''}</div>`;
+    case 'button':{const primary=c.style!=='secondary';return `<div style="padding:6px ${GUTTER+2}px 12px;"><button class="gbtn" data-nav="${c.navTo||''}" style="width:100%;padding:14px;border-radius:100px;border:${primary?'none':'1.5px solid rgba(23,19,11,.15)'};background:${primary?accent:'transparent'};color:${primary?'#fff':'#17130B'};font-weight:700;font-size:14px;cursor:pointer;box-shadow:${primary?'0 2px 8px -2px '+accent+'66':'none'};">${c.label||''}</button></div>`;}
+    case 'input': return `<div style="padding:0 ${GUTTER+2}px 12px;"><div style="padding:13px 16px;border-radius:${RADIUS_MD}px;background:#F7F5EF;border:1px solid rgba(23,19,11,.1);color:#8a8578;font-size:13.5px;">${c.placeholder||''}</div></div>`;
+    case 'quantity_stepper':{const qty=c.quantity||1;const id='qty_'+Math.random().toString(36).slice(2,8);return `<div style="margin:0 ${GUTTER}px 10px;padding:12px 14px;border-radius:${RADIUS_MD}px;background:#fff;box-shadow:${CARD_SHADOW};display:flex;align-items:center;gap:12px;">${c.title?`<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13.5px;">${c.title}</div>${c.subtitle?`<div style="font-size:11.5px;color:#8a8578;margin-top:2px;">${c.subtitle}</div>`:''}</div>`:'<div style="flex:1;"></div>'}<div style="display:flex;align-items:center;background:#F7F5EF;border-radius:100px;padding:2px;"><button type="button" style="width:28px;height:28px;border-radius:50%;border:none;background:#fff;box-shadow:0 1px 2px rgba(23,19,11,.12);font-size:15px;font-weight:700;color:${accent};" onclick="const el=document.getElementById('${id}');let v=parseInt(el.textContent);if(v>1)el.textContent=v-1;">−</button><span id="${id}" style="width:32px;text-align:center;font-weight:700;font-size:13.5px;">${qty}</span><button type="button" style="width:28px;height:28px;border-radius:50%;border:none;background:${accent};font-size:15px;font-weight:700;color:#fff;" onclick="const el=document.getElementById('${id}');el.textContent=parseInt(el.textContent)+1;">+</button></div></div>`;}
+    case 'list_row': return `<div class="gcard" data-nav="${c.navTo||''}" style="margin:0 ${GUTTER}px;padding:14px 4px;border-bottom:1px solid rgba(23,19,11,.07);display:flex;justify-content:space-between;align-items:center;cursor:${c.navTo?'pointer':'default'};"><div><div style="font-weight:700;font-size:14px;">${c.title||''}</div><div style="font-size:12px;color:#8a8578;margin-top:3px;font-weight:500;">${c.subtitle||''}</div></div><div style="font-size:12.5px;color:${accent};font-weight:700;margin-left:12px;">${c.trailing||(c.navTo?'›':'')}</div></div>`;
+    case 'stat':{const m=String(c.value).match(/^(\d(?:\.\d)?)\s*(★|stars?)$/i);let v=c.value;if(m){const r=parseFloat(m[1]);const f=Math.round(r);v=`<span style="letter-spacing:1px;">${'★'.repeat(Math.min(f,5))}${'☆'.repeat(Math.max(5-f,0))}</span> <span style="font-size:13px;font-weight:700;color:#8a8578;">${r}</span>`;}return `<div style="display:inline-block;padding:14px 18px;margin:0 8px 12px ${GUTTER}px;background:#fff;box-shadow:${CARD_SHADOW};border-radius:${RADIUS_MD}px;text-align:center;"><div style="font-weight:800;font-size:${m?15:20}px;font-family:'Space Grotesk';color:${m?'#D4A017':'inherit'};">${v}</div><div style="font-size:11px;color:#8a8578;margin-top:3px;font-weight:600;">${c.label||''}</div></div>`;}
+    case 'image_banner':{const h=c.full_bleed?220:140;const mg=c.full_bleed?'0 0 14px':'0 16px 14px';const rd=c.full_bleed?'0':'16px';return `<div style="margin:${mg};height:${h}px;border-radius:${rd};overflow:hidden;position:relative;"><img src="${photoUrl(c,500,h*2)}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">${c.caption?`<div style="position:absolute;bottom:0;left:0;right:0;padding:20px 16px 12px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.55));"><div style="color:#fff;font-size:14px;font-weight:700;">${c.caption}</div></div>`:''}</div>`;}
+    case 'avatar':{const sm={small:32,medium:48,large:80};const sz=sm[c.size]||48;return `<div style="padding:8px 20px;"><div style="width:${sz}px;height:${sz}px;border-radius:50%;overflow:hidden;border:2px solid #fff;box-shadow:0 1px 4px rgba(23,19,11,.12);"><img src="${photoUrl(c,sz*2,sz*2)}" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></div></div>`;}
+    case 'map_placeholder': return `<div style="margin:0 16px 14px;height:180px;border-radius:16px;background:repeating-linear-gradient(45deg,#e8e5dc,#e8e5dc 10px,#f0eee6 10px,#f0eee6 20px);display:flex;align-items:center;justify-content:center;position:relative;"><div style="width:14px;height:14px;background:${accent};border-radius:50%;box-shadow:0 0 0 6px ${accent}33;"></div><div style="position:absolute;bottom:10px;font-size:11px;color:#8a8578;background:#fff;padding:4px 10px;border-radius:100px;">${c.caption||'Live location'}</div></div>`;
+    case 'divider': return `<div style="height:1px;background:rgba(23,19,11,.08);margin:8px 20px;"></div>`;
+    case 'spacer': return `<div style="height:14px;"></div>`;
+    case 'tabbar':{const items=c.items||[];const IC={home:'⌂',explore:'◎',search:'⚲',discover:'◎',browse:'▤',cart:'⛃',bag:'⛃',shop:'⛃',orders:'▤',order:'▤',bookings:'▤',booking:'▤',trips:'▤',chat:'✉',messages:'✉',message:'✉',inbox:'✉',activity:'◔',profile:'◉',account:'◉',you:'◉',me:'◉',favorites:'♡',wishlist:'♡',saved:'♡',likes:'♡',dashboard:'▦',analytics:'▦',stats:'▦',cards:'▭',wallet:'▭',payments:'▭',payment:'▭',billing:'▭',groups:'◈',community:'◈',social:'◈',post:'+',add:'+',record:'●',map:'⚑',tracking:'⚑',track:'⚑',nearby:'⚑'};
+      function ic(l,i){const k=(l||'').toLowerCase().trim();if(IC[k])return IC[k];for(const w of k.split(/[\s_-]+/))if(IC[w])return IC[w];return ['⌂','◎','▤','◉','☰'][i%5];}
+      return `<div style="position:sticky;bottom:0;background:#fff;border-top:1px solid rgba(23,19,11,.08);display:flex;padding:8px 0;margin-top:auto;box-shadow:0 -2px 12px -6px rgba(23,19,11,.06);">${items.map((it,i)=>{const nid=(c.navMap&&c.navMap[it])||'';const act=nid&&nid===(window.__cur||'');return `<div class="gcard" data-nav="${nid}" style="flex:1;text-align:center;cursor:${nid?'pointer':'default'};position:relative;padding-top:2px;">${act?`<div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:22px;height:3px;border-radius:0 0 3px 3px;background:${accent};"></div>`:''}<div style="font-size:18px;color:${act?accent:'#8a8578'};">${ic(it,i)}</div><div style="font-size:10px;margin-top:3px;color:${act?accent:'#8a8578'};font-weight:${act?'800':'600'};">${it}</div></div>`;}).join('')}</div>`;}
+    default: return '';
+  }
+}
+let navStack=[], curScreen=null;
+function renderScreen(id){
+  const scr=S.prototype.screens.find(s=>s.id===id); if(!scr) return;
+  curScreen=id; window.__cur=id;
+  const accent=S.prototype.primaryColor||'#FF5A36';
+  const frame=document.getElementById('appFrame');
+  frame.style.display='flex'; frame.style.flexDirection='column';
+  frame.innerHTML=`<div style="display:flex;flex-direction:column;min-height:100%;">${scr.components.map(c=>componentHTML(c,accent)).join('')}</div>`;
+  frame.querySelectorAll('[data-nav]').forEach(el=>{const n=el.getAttribute('data-nav');if(n)el.addEventListener('click',()=>navTo(n));});
+  const back=document.getElementById('navBack'); if(back) back.disabled=navStack.length<1;
+}
+function navTo(id,initial){ if(!initial&&curScreen) navStack.push(curScreen); renderScreen(id); }
+function navBack(){ if(navStack.length) renderScreen(navStack.pop()); }
+function navHome(){ navStack=[]; renderScreen(S.prototype.startScreen); }
+
+// ============================================================
+// Boot
+// ============================================================
+function boot(){
+  const chips=document.getElementById('chips');
+  EXAMPLES.forEach(ex=>{
+    const b=document.createElement('button'); b.className='chip'; b.textContent=ex;
+    b.onclick=()=>{document.getElementById('ideaInput').value=ex;};
+    chips.appendChild(b);
+  });
+  // Preload the catalog so the configurator is ready the moment a prototype lands.
+  fetch('/.netlify/functions/catalog').then(r=>r.json()).then(d=>{S.catalog=d.categories;}).catch(()=>{});
+}
+boot();
+
+function setStep(step){
+  const order=['proto','estimate','plan','team'];
+  const idx=order.indexOf(step);
+  document.querySelectorAll('#rail .node').forEach(n=>{
+    const i=order.indexOf(n.dataset.step);
+    n.classList.toggle('on', i===idx);
+    n.classList.toggle('done', i<idx);
+  });
+}
+
+// ============================================================
+// Step 1 — generate prototype
+// ============================================================
+async function startGeneration(){
+  const idea=document.getElementById('ideaInput').value.trim();
+  if(!idea){ document.getElementById('ideaInput').focus(); return; }
+  S.idea=idea;
+  const btn=document.getElementById('generateBtn');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Building…';
+
+  try{
+    const res=await fetch('/.netlify/functions/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:idea})});
+    const data=await res.json();
+    if(!res.ok){ throw new Error(data.error||'Generation failed'); }
+    if(data.isValidAppIdea===false){
+      btn.disabled=false; btn.innerHTML='Build my prototype <span>→</span>';
+      alert((data.reason||'That doesn\'t look like an app idea yet.')+'\n\n'+(data.suggestion||''));
+      return;
+    }
+    S.prototype=data;
+    openWorkspace();
+  }catch(err){
+    btn.disabled=false; btn.innerHTML='Build my prototype <span>→</span>';
+    alert(err.message||'Something went wrong. Please try again.');
+  }
+}
+
+function openWorkspace(){
+  document.getElementById('hero').classList.add('hidden');
+  document.getElementById('workspace').classList.add('show');
+  document.getElementById('protoName').textContent=S.prototype.appName||'Your prototype';
+  navStack=[]; renderScreen(S.prototype.startScreen);
+  // prime configurator
+  buildCategorySelect();
+  document.getElementById('catSelect').value=guessCategory(S.idea);
+  renderFeatures();
+  setStep('estimate');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ============================================================
+// Step 2 — estimate configurator
+// ============================================================
+function buildCategorySelect(){
+  const sel=document.getElementById('catSelect');
+  if(!S.catalog){ sel.innerHTML='<option value="custom">Custom / Other</option>'; return; }
+  sel.innerHTML=S.catalog.map(c=>`<option value="${c.key}">${c.label}</option>`).join('');
+}
+function currentCat(){
+  const key=document.getElementById('catSelect').value;
+  return (S.catalog||[]).find(c=>c.key===key) || {key:'custom',features:[],ai:[]};
+}
+function renderFeatures(){
+  S.selected=new Set();
+  const cat=currentCat();
+  const wrap=document.getElementById('featureChecks');
+  const rows=[
+    ...cat.features.map(l=>({label:l,ai:false})),
+    ...cat.ai.map(l=>({label:l,ai:true})),
+  ];
+  wrap.innerHTML=rows.map(r=>`<label class="check" onclick="toggleFeature(this)" data-label="${r.label.replace(/"/g,'&quot;')}">
+      <span class="box">✓</span><span>${r.label}</span>${r.ai?'<span class="tag-ai">AI</span>':''}</label>`).join('');
+  document.getElementById('estimateOut').innerHTML='';
+}
+function toggleFeature(el){
+  const label=el.dataset.label;
+  if(S.selected.has(label)){ S.selected.delete(label); el.classList.remove('on'); }
+  else{ S.selected.add(label); el.classList.add('on'); }
+}
+function togglePlat(btn){
+  const p=btn.dataset.plat;
+  if(btn.classList.contains('on') && S.platform.length===1) return; // keep at least one
+  btn.classList.toggle('on');
+  S.platform=[...document.querySelectorAll('#platformRow .toggle.on')].map(b=>b.dataset.plat);
+}
+function selectSize(btn){
+  document.querySelectorAll('#scopeRow .toggle').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); S.size=btn.dataset.size;
+}
+
+function money(n){ return '$'+Math.round(n).toLocaleString(); }
+
+async function runEstimate(){
+  const btn=document.getElementById('estimateBtn');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Calculating…';
+  try{
+    const payload={ category:document.getElementById('catSelect').value, platform:S.platform, size:S.size, selectedLabels:[...S.selected] };
+    const res=await fetch('/.netlify/functions/estimate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const e=await res.json();
+    if(!res.ok) throw new Error(e.error||'Could not calculate');
+    S.estimate=e;
+    renderEstimate(e);
+    document.getElementById('panelPlan').classList.remove('locked');
+    setStep('plan');
+  }catch(err){
+    document.getElementById('estimateOut').innerHTML=`<div class="msg err">${err.message}</div>`;
+  }finally{
+    btn.disabled=false; btn.innerHTML='Recalculate';
+  }
+}
+function renderEstimate(e){
+  const pk=e.recommendedPackage||{};
+  document.getElementById('estimateOut').innerHTML=`
+    <div class="est">
+      <div class="big">${money(e.total)} <small>starting estimate</small></div>
+      <div style="margin-top:16px;">
+        <div class="row"><span>Timeline</span><b>${e.timeline}</b></div>
+        <div class="row"><span>Platform</span><b>${e.platformLabel}</b></div>
+        <div class="row"><span>Scope</span><b>${e.sizeLabel}</b></div>
+        <div class="row"><span>Add-ons selected</span><b>${(e.lineItems||[]).length}</b></div>
+      </div>
+      <div class="pkg">
+        <div class="n">Recommended: ${pk.name||''}</div>
+        <div class="b">${pk.best||''}</div>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// Step 3+4 — unlock plan: capture lead, save deal, generate spec
+// ============================================================
+async function unlockPlan(){
+  const name=document.getElementById('leadName').value.trim();
+  const email=document.getElementById('leadEmail').value.trim();
+  const company=document.getElementById('leadCompany').value.trim();
+  const msg=document.getElementById('planMsg');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    msg.innerHTML='<div class="msg err">Please enter a valid work email.</div>'; return;
+  }
+  const btn=document.getElementById('planBtn');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Generating your plan…';
+  msg.innerHTML='<div class="loading-inline"><span class="spin dark"></span> Writing the engineering spec — this takes a few seconds…</div>';
+
+  try{
+    // 1) generate the build-ready spec
+    const specRes=await fetch('/.netlify/functions/spec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prototype:S.prototype,idea:S.idea})});
+    const spec=await specRes.json();
+    if(!specRes.ok) throw new Error(spec.error||'Could not generate the spec');
+    S.spec=spec;
+
+    // 2) save the whole deal → shareable deal room
+    let dealUrl='';
+    try{
+      const saveRes=await fetch('/.netlify/functions/save-deal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idea:S.idea,prototype:S.prototype,estimate:S.estimate,spec:S.spec})});
+      const saved=await saveRes.json();
+      if(saveRes.ok && saved.id){ S.dealId=saved.id; dealUrl=location.origin+'/p.html?id='+saved.id; S.dealUrl=dealUrl; }
+    }catch(_){/* deal room is a bonus; never block the plan on it */}
+
+    // 3) capture the lead + notify sales (fire and forget — must never block UX)
+    fetch('/.netlify/functions/capture-lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      name,email,company,idea:S.idea,estimate:S.estimate,dealId:S.dealId,dealUrl:S.dealUrl
+    })}).catch(()=>{});
+
+    renderSpec(spec, dealUrl);
+    setStep('team');
+    msg.innerHTML='';
+    document.getElementById('panelPlan').classList.add('hidden');
+    document.getElementById('panelSpec').classList.remove('hidden');
+    document.getElementById('panelSpec').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){
+    btn.disabled=false; btn.innerHTML='Generate my build plan →';
+    msg.innerHTML=`<div class="msg err">${err.message}</div>`;
+  }
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderSpec(spec, dealUrl){
+  document.getElementById('specTitle').textContent=(spec.appName||'Product')+' — build plan';
+  const screens=(spec.screens||[]).map(s=>`
+    <div class="screen-card">
+      <div class="h"><span class="t">${esc(s.title||s.id)}</span><span class="eff ${esc(s.effort||'M')}">${esc(s.effort||'M')}</span></div>
+      <div class="p">${esc(s.purpose||'')}</div>
+      ${(s.userStories||[]).length?`<ul>${s.userStories.map(u=>`<li>${esc(u)}</li>`).join('')}</ul>`:''}
+    </div>`).join('');
+  const data=(spec.dataModel||[]).map(d=>`<div class="kv"><b>${esc(d.entity)}</b> — ${esc((d.fields||[]).join(', '))}${d.notes?` · <i>${esc(d.notes)}</i>`:''}</div>`).join('');
+  const api=(spec.apiSurface||[]).map(a=>`<div class="kv"><b>${esc(a.method)}</b> <code>${esc(a.path)}</code> — ${esc(a.purpose)}</div>`).join('');
+  const share=dealUrl?`
+    <div class="share-box">
+      <div class="lbl">✓ Saved — share this deal room</div>
+      <div class="share-link">
+        <input type="text" id="shareUrl" readonly value="${esc(dealUrl)}">
+        <button onclick="copyShare()">Copy</button>
+      </div>
+      <div style="font-size:12px;color:#9A6B00;margin-top:8px;">Send this to a colleague — it opens the prototype, estimate, and this plan.</div>
+    </div>`:'';
+
+  document.getElementById('specOut').innerHTML=`
+    <div class="spec-block">
+      <div class="spec-summary">${esc(spec.summary||'')}</div>
+      ${(spec.coreValue)?`<div class="g">Core value</div><div style="font-size:13.5px;color:var(--body)">${esc(spec.coreValue)}</div>`:''}
+      ${(spec.targetUsers||[]).length?`<div class="g">Target users</div><div>${spec.targetUsers.map(u=>`<span class="pill">${esc(u)}</span>`).join('')}</div>`:''}
+      <div class="g">Screens &amp; user stories (${(spec.screens||[]).length})</div>
+      ${screens}
+      ${data?`<div class="g">Data model</div>${data}`:''}
+      ${api?`<div class="g">API surface</div>${api}`:''}
+      ${(spec.integrations||[]).length?`<div class="g">Integrations</div><div>${spec.integrations.map(i=>`<span class="pill" style="background:#E7EEFE;color:#2B4B8F">${esc(i)}</span>`).join('')}</div>`:''}
+      ${(spec.risks||[]).length?`<div class="g">Risks to plan for</div><ul style="list-style:none">${spec.risks.map(r=>`<li style="font-size:12.5px;color:var(--body);padding-left:14px;position:relative;margin-bottom:4px;">⚠ ${esc(r)}</li>`).join('')}</ul>`:''}
+      ${share}
+      <a class="btn-ghost" href="https://www.virtualemployee.com" target="_blank" rel="noopener" style="margin-top:18px;">Book a call with the team that builds it →</a>
+    </div>`;
+}
+
+function copyShare(){
+  const el=document.getElementById('shareUrl'); el.select();
+  navigator.clipboard?.writeText(el.value);
+  const btn=el.nextElementSibling; const t=btn.textContent; btn.textContent='Copied!'; setTimeout(()=>btn.textContent=t,1400);
+}
+
+function resetAll(){ location.reload(); }
+</script>
+</body>
+</html>
