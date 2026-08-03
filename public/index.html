@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Case Study Agent — raw text to a finished, designed case study</title>
+<title>Case Study Agent — one format, one design, every time</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
 :root{
   --bg:#0E1013; --panel:#171A1F; --panel-2:#1E222A; --line:#2A2F39;
   --ink:#F2F4F7; --muted:#9AA3AF; --faint:#6B7280;
-  --accent:#5B8DEF; --accent-2:#7C5CFC; --ok:#3DD68C; --warn:#F0A83A; --err:#F0655A;
+  --accent:#5B8DEF; --accent-2:#7C5CFC; --ok:#3DD68C; --err:#F0655A;
   --r:16px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -21,7 +21,6 @@ button{font-family:inherit;cursor:pointer;border:none;}
 .app{display:grid;grid-template-columns:minmax(340px,420px) 1fr;height:100vh;}
 @media(max-width:820px){.app{grid-template-columns:1fr;height:auto;}}
 
-/* ---------- left: control panel ---------- */
 .left{border-right:1px solid var(--line);padding:26px 24px;overflow-y:auto;display:flex;flex-direction:column;}
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
 .brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;}
@@ -29,22 +28,20 @@ button{font-family:inherit;cursor:pointer;border:none;}
 .brand small{display:block;font-size:11.5px;color:var(--faint);font-weight:500;margin-top:1px;}
 .lede{font-size:13px;color:var(--muted);margin:14px 0 18px;}
 .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:8px;}
-textarea{width:100%;min-height:230px;resize:vertical;background:var(--panel);border:1px solid var(--line);border-radius:12px;
-  color:var(--ink);font-family:inherit;font-size:13.5px;line-height:1.6;padding:14px;outline:none;}
+textarea{width:100%;min-height:220px;resize:vertical;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:var(--ink);font-family:inherit;font-size:13.5px;line-height:1.6;padding:14px;outline:none;}
 textarea:focus{border-color:var(--accent);}
 textarea::placeholder{color:var(--faint);}
 .row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px;}
 .counter{font-size:11.5px;color:var(--faint);}
 .samplebtn{font-size:12px;color:var(--accent);background:none;font-weight:600;}
-.go{width:100%;margin-top:16px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:15px;
-  padding:14px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:9px;transition:filter .15s,transform .15s;}
+.go{width:100%;margin-top:16px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:15px;padding:14px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:9px;transition:filter .15s,transform .15s;}
 .go:hover:not(:disabled){filter:brightness(1.07);transform:translateY(-1px);}
 .go:disabled{opacity:.55;cursor:default;}
 
-/* stages */
 .stages{margin-top:22px;display:flex;flex-direction:column;gap:2px;}
 .stage{display:flex;align-items:center;gap:11px;padding:9px 2px;font-size:13px;color:var(--faint);}
 .stage .ring{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;}
+.stage .who{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:1px 6px;}
 .stage.active{color:var(--ink);}
 .stage.active .ring{border-color:var(--accent);border-top-color:transparent;animation:sp .7s linear infinite;}
 .stage.done{color:var(--muted);}
@@ -55,7 +52,6 @@ textarea::placeholder{color:var(--faint);}
 .msg.err{background:rgba(240,101,90,.12);color:#F19A91;border:1px solid rgba(240,101,90,.3);}
 .foot{margin-top:auto;padding-top:20px;font-size:11px;color:var(--faint);}
 
-/* ---------- right: preview ---------- */
 .right{display:flex;flex-direction:column;background:#0A0C0E;min-height:100vh;}
 .bar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);gap:12px;}
 .bar .title{font-size:13px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px;}
@@ -70,24 +66,23 @@ textarea::placeholder{color:var(--faint);}
 iframe{width:100%;height:100%;border:none;background:#fff;display:block;}
 .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--faint);padding:40px;}
 .empty .big{font-family:'Fraunces',serif;font-size:26px;color:var(--muted);margin-bottom:10px;}
-.empty p{font-size:13.5px;max-width:38ch;}
+.empty p{font-size:13.5px;max-width:40ch;}
 .hidden{display:none !important;}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- LEFT -->
   <aside class="left">
     <div class="brand">
       <div class="logo">✳</div>
-      <div><h1>Case Study Agent</h1><small>raw text → finished case study</small></div>
+      <div><h1>Case Study Agent</h1><small>one format · one design · every time</small></div>
     </div>
-    <p class="lede">Paste any raw material — notes, an email thread, a call transcript, bullet points. The agent writes it, art-directs it, illustrates it, and designs a ready-to-ship HTML page.</p>
+    <p class="lede">Paste raw material. A pipeline of agents runs: a <b>writer</b> puts it in one fixed format, <b>Claude</b> designs it into one fixed template, an <b>illustrator</b> makes the images. Every case study comes out consistent — and downloadable.</p>
 
     <div class="label">Raw input</div>
     <textarea id="input" maxlength="20000" placeholder="e.g.
 
-We helped Northwind, a logistics startup, cut their driver onboarding from 3 weeks to 4 days. Their old process was all paper and email. We built a mobile onboarding app with document capture and automatic verification. Result: onboarding time down 80%, support tickets down by half. Their COO said it was the smoothest rollout they'd ever had."></textarea>
+We helped Northwind, a logistics startup, cut driver onboarding from 3 weeks to 4 days. Their old process was all paper and email. We built a mobile onboarding app with document capture and automatic verification. Result: onboarding time down 80%, support tickets down by half. Their COO said it was the smoothest rollout they'd ever had."></textarea>
     <div class="row">
       <span class="counter" id="counter">0 / 20,000</span>
       <button class="samplebtn" onclick="loadSample()">Use sample</button>
@@ -96,18 +91,17 @@ We helped Northwind, a logistics startup, cut their driver onboarding from 3 wee
     <button class="go" id="go" onclick="run()">✳ Generate case study</button>
 
     <div class="stages" id="stages">
-      <div class="stage" data-k="write"><span class="ring">1</span> Writing the story</div>
-      <div class="stage" data-k="art"><span class="ring">2</span> Art directing &amp; theming</div>
-      <div class="stage" data-k="draw"><span class="ring">3</span> Illustrating images</div>
-      <div class="stage" data-k="design"><span class="ring">4</span> Designing the page</div>
+      <div class="stage" data-k="write"><span class="ring">1</span> Writing (fixed format) <span class="who">OpenAI</span></div>
+      <div class="stage" data-k="design"><span class="ring">2</span> Designing into the template <span class="who">Claude</span></div>
+      <div class="stage" data-k="draw"><span class="ring">3</span> Illustrating images <span class="who">OpenAI</span></div>
+      <div class="stage" data-k="render"><span class="ring">4</span> Rendering the page <span class="who">Template</span></div>
     </div>
 
     <div id="msg"></div>
 
-    <div class="foot">Runs on the OpenAI API. Your API key stays server-side. Images are embedded directly in the HTML, so the downloaded file is fully self-contained.</div>
+    <div class="foot">Writer &amp; illustrator use the OpenAI API; the design agent uses the Anthropic (Claude) API. Keys stay server-side. Images are embedded in the HTML, so the download is fully self-contained.</div>
   </aside>
 
-  <!-- RIGHT -->
   <main class="right">
     <div class="bar" id="bar">
       <div class="title"><span class="dot"></span><span id="barLabel">Preview</span></div>
@@ -121,7 +115,7 @@ We helped Northwind, a logistics startup, cut their driver onboarding from 3 wee
       <iframe id="preview" class="hidden" sandbox="allow-same-origin"></iframe>
       <div class="empty" id="empty">
         <div class="big">Your case study appears here</div>
-        <p>Paste raw text on the left and hit generate. You'll get a designed, illustrated, downloadable case study in about a minute.</p>
+        <p>Paste raw text on the left and hit generate. Every run produces the same fixed format and the same template — designed by Claude, written by OpenAI.</p>
       </div>
     </div>
   </main>
@@ -130,6 +124,13 @@ We helped Northwind, a logistics startup, cut their driver onboarding from 3 wee
 <script>
 const $ = (id) => document.getElementById(id);
 let currentHTML = "";
+
+// The fixed, approved accent palette. Mirrors PALETTE in design-casestudy.js;
+// the design agent returns a key, the template maps it to a hex value.
+const PALETTE = {
+  indigo:"#4F46E5", teal:"#0EA5A4", crimson:"#E11D48", amber:"#D97706",
+  forest:"#0E8A5F", slate:"#475569", plum:"#7C3AED", rust:"#C2410C",
+};
 
 const SAMPLE = `Client: Northwind Logistics, a mid-size regional freight company.
 Problem: driver onboarding took about 3 weeks. Everything was paper forms, scanned documents over email, and a lot of manual back-and-forth with compliance. New drivers sat idle waiting to be cleared, and the ops team was drowning in follow-ups.
@@ -148,61 +149,66 @@ function setStage(k, state){
   el.classList.remove("active","done","err");
   if(state) el.classList.add(state);
   const ring = el.querySelector(".ring");
-  if(state==="done") ring.textContent="✓";
-  else if(state==="err") ring.textContent="!";
+  const nums = {write:"1",design:"2",draw:"3",render:"4"};
+  if(state==="done") ring.textContent="✓"; else if(state==="err") ring.textContent="!"; else ring.textContent=nums[k];
 }
-function resetStages(){ ["write","art","draw","design"].forEach(k=>{ setStage(k,null); const r=document.querySelector(`.stage[data-k="${k}"] .ring`); r.textContent={write:"1",art:"2",draw:"3",design:"4"}[k]; }); }
+function resetStages(){ ["write","design","draw","render"].forEach(k=>setStage(k,null)); }
 function showError(t){ $("msg").innerHTML = `<div class="msg err">${escapeHtml(t)}</div>`; }
+function setButtons(on){ ["btnCopy","btnNew","btnDl"].forEach(id=>{ $(id).disabled = !on; }); }
 
 async function run(){
   const text = $("input").value.trim();
   if(!text){ $("input").focus(); return; }
   $("msg").innerHTML = "";
   resetStages();
-  const go = $("go"); go.disabled = true; go.innerHTML = '<span style="width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:sp .7s linear infinite"></span> Working…';
+  const go = $("go"); go.disabled = true;
+  go.innerHTML = '<span style="width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:sp .7s linear infinite"></span> Working…';
   setButtons(false);
 
   try{
-    // STAGE 1+2 — write + art direct (one model call returns both)
+    // AGENT 1 — writer (OpenAI): raw text → fixed-format content
     setStage("write","active");
-    const csRes = await fetch("/.netlify/functions/generate-casestudy",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
-    const cs = await csRes.json();
-    if(!csRes.ok) throw new Error(cs.error || "Could not write the case study.");
+    const cRes = await fetch("/.netlify/functions/generate-content",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+    const content = await cRes.json();
+    if(!cRes.ok) throw new Error(content.error || "The writer agent failed.");
     setStage("write","done");
-    setStage("art","done");
 
-    // Apply the chosen accent to the app chrome for a cohesive feel.
-    document.documentElement.style.setProperty("--accent", cs.theme.accent);
-
-    // STAGE 4 (early) — show the designed page immediately with image
-    // placeholders, so the user sees the result while images render.
+    // AGENT 2 — designer (Claude): content → design plan for the one template
     setStage("design","active");
-    const images = { hero:null, sections:{} };
-    renderPreview(cs, images, false);
+    const dRes = await fetch("/.netlify/functions/design-casestudy",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({content})});
+    const design = await dRes.json();
+    if(!dRes.ok) throw new Error(design.error || "The design agent (Claude) failed.");
+    setStage("design","done");
+
+    // apply the accent Claude chose to the app chrome
+    document.documentElement.style.setProperty("--accent", PALETTE[design.accent] || PALETTE.indigo);
+
+    // render the template now (images fill in next) so the result shows immediately
+    setStage("render","active");
+    const images = { hero:null, mid:null };
+    renderPreview(content, design, images);
     $("empty").classList.add("hidden");
     $("preview").classList.remove("hidden");
 
-    // STAGE 3 — illustrate. Gather every prompt and generate in parallel;
-    // a failed image simply falls back to a tasteful gradient, never blocks.
+    // AGENT 3 — illustrator (OpenAI images): the two fixed image slots, in parallel
     setStage("draw","active");
     const jobs = [];
-    if(cs.hero?.imagePrompt) jobs.push(makeImage(cs.hero.imagePrompt,"landscape").then(u=>{images.hero=u;}));
-    (cs.sections||[]).forEach((s,i)=>{ if(s.imagePrompt) jobs.push(makeImage(s.imagePrompt,"landscape").then(u=>{images.sections[i]=u;})); });
-
+    if(design.heroImage?.prompt) jobs.push(makeImage(design.heroImage.prompt,"landscape").then(u=>{images.hero=u;}));
+    if(design.midImage?.prompt) jobs.push(makeImage(design.midImage.prompt,"landscape").then(u=>{images.mid=u;}));
     if(jobs.length){
       $("barLabel").textContent = `Illustrating ${jobs.length} image${jobs.length>1?"s":""}…`;
       await Promise.allSettled(jobs);
     }
     setStage("draw","done");
 
-    // Final render with images baked in.
-    renderPreview(cs, images, true);
-    setStage("design","done");
+    // final render with images baked in
+    renderPreview(content, design, images);
+    setStage("render","done");
     $("barLabel").textContent = "Ready";
     $("bar").classList.add("ready");
     setButtons(true);
   }catch(err){
-    ["write","art","draw","design"].forEach(k=>{ const el=document.querySelector(`.stage[data-k="${k}"]`); if(el.classList.contains("active")) setStage(k,"err"); });
+    ["write","design","draw","render"].forEach(k=>{ const el=document.querySelector(`.stage[data-k="${k}"]`); if(el.classList.contains("active")) setStage(k,"err"); });
     showError(err.message || "Something went wrong. Please try again.");
   }finally{
     go.disabled = false; go.innerHTML = "✳ Generate case study";
@@ -218,152 +224,150 @@ async function makeImage(prompt, orientation){
   }catch(_){ return null; }
 }
 
-function setButtons(on){ ["btnCopy","btnNew","btnDl"].forEach(id=>{ $(id).disabled = !on; }); }
-
-function renderPreview(cs, images, done){
-  currentHTML = buildHTML(cs, images);
+function renderPreview(content, design, images){
+  currentHTML = buildHTML(content, design, images);
   $("preview").srcdoc = currentHTML;
 }
 
 // ---------- helpers ----------
 function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function slug(s){ return String(s||"case-study").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,60) || "case-study"; }
-
-// Renders section body: paragraphs (blank-line separated), **bold**, "- " bullets.
 function renderBody(body){
-  const blocks = String(body).split(/\n\s*\n/);
+  const blocks = String(body||"").split(/\n\s*\n/).filter(b=>b.trim());
   let html = "";
   for(const b of blocks){
     const lines = b.split(/\n/).map(l=>l.trim()).filter(Boolean);
     if(lines.length && lines.every(l=>l.startsWith("- "))){
-      html += "<ul>"+lines.map(l=>`<li>${inline(l.slice(2))}</li>`).join("")+"</ul>";
+      html += "<ul>"+lines.map(l=>`<li>${inline(escapeHtml(l.slice(2)))}</li>`).join("")+"</ul>";
     }else{
       html += `<p>${inline(escapeHtml(b).replace(/\n/g,"<br>"))}</p>`;
     }
   }
-  return html;
+  return html || "<p></p>";
 }
 function inline(s){ return String(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>"); }
+function shade(hex, amt){
+  const m=/^#([0-9a-f]{6})$/i.exec(hex); if(!m) return hex;
+  const n=parseInt(m[1],16);
+  const r=Math.max(0,Math.min(255,(n>>16)+amt)), g=Math.max(0,Math.min(255,((n>>8)&255)+amt)), b=Math.max(0,Math.min(255,(n&255)+amt));
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
 
-// Builds the full, self-contained case study document.
-function buildHTML(cs, images){
-  const accent = cs.theme.accent || "#3B5BDB";
-  const isSerif = cs.theme.font === "serif";
-  const headFont = isSerif ? "'Fraunces', Georgia, serif" : "'Inter', system-ui, sans-serif";
-  const heroImg = images.hero;
-  const heroBg = heroImg
-    ? `background-image:linear-gradient(180deg,rgba(10,12,16,.15),rgba(10,12,16,.72)),url('${heroImg}');background-size:cover;background-position:center;`
-    : `background:linear-gradient(135deg,${accent},${shade(accent,-35)});`;
+// The ONE fixed template. Same structure and typography for every case study;
+// only the accent (from the approved palette), the copy, and the two images
+// vary. This is what makes "one design format" true.
+function buildHTML(content, design, images){
+  const accent = PALETTE[design.accent] || PALETTE.indigo;
+  const hero = images.hero;
+  const heroBg = hero
+    ? `background-image:linear-gradient(180deg,rgba(10,12,16,.15),rgba(10,12,16,.74)),url('${hero}');background-size:cover;background-position:center;`
+    : `background:linear-gradient(135deg,${accent},${shade(accent,-40)});`;
 
-  const metrics = (cs.metrics||[]).length ? `
+  const heroStat = design.heroMetric
+    ? `<div class="hero-stat"><div class="hs-v">${escapeHtml(design.heroMetric.value)}</div><div class="hs-l">${escapeHtml(design.heroMetric.label)}</div></div>`
+    : "";
+
+  const metrics = (design.metrics||[]).length ? `
     <section class="metrics"><div class="wrap metrics-grid">
-      ${cs.metrics.map(m=>`<div class="metric"><div class="mv">${escapeHtml(m.value)}</div><div class="ml">${escapeHtml(m.label)}</div></div>`).join("")}
+      ${design.metrics.map(m=>`<div class="metric"><div class="mv">${escapeHtml(m.value)}</div><div class="ml">${escapeHtml(m.label)}</div></div>`).join("")}
     </div></section>` : "";
 
-  const sections = (cs.sections||[]).map((s,i)=>{
-    const img = images.sections[i];
-    const media = (s.imagePrompt)
-      ? `<div class="s-media">${img?`<img src="${img}" alt="">`:`<div class="s-ph" style="background:linear-gradient(135deg,${accent},${shade(accent,-30)})"></div>`}</div>`
-      : "";
-    const cls = s.imagePrompt ? (i%2===0?"s-split":"s-split rev") : "s-solo";
-    return `<section class="section ${cls}">
-      <div class="wrap s-inner">
-        <div class="s-text"><h2>${escapeHtml(s.heading)}</h2>${renderBody(s.body)}</div>
-        ${media}
-      </div></section>`;
-  }).join("");
+  const midImg = images.mid;
+  const solutionMedia = `<figure class="s-media">${
+    midImg ? `<img src="${midImg}" alt="">` : `<div class="s-ph" style="background:linear-gradient(135deg,${accent},${shade(accent,-32)})"></div>`
+  }${design.midImage?.caption ? `<figcaption>${escapeHtml(design.midImage.caption)}</figcaption>` : ""}</figure>`;
 
-  const quote = cs.quote ? `
+  // The four canonical sections, always in this order.
+  const section = (heading, body, extra="") => `
+    <section class="section"><div class="wrap">
+      <h2>${escapeHtml(heading)}</h2>
+      <div class="s-body">${renderBody(body)}</div>
+      ${extra}
+    </div></section>`;
+
+  const quote = design.pullQuote ? `
     <section class="quote"><div class="wrap">
-      <blockquote>“${escapeHtml(cs.quote.text)}”</blockquote>
-      <div class="q-by"><span class="q-bar"></span><div><strong>${escapeHtml(cs.quote.author||"")}</strong>${cs.quote.role?`<span>${escapeHtml(cs.quote.role)}</span>`:""}</div></div>
+      <blockquote>“${escapeHtml(design.pullQuote.text)}”</blockquote>
+      <div class="q-by"><span class="q-bar"></span><div><strong>${escapeHtml(design.pullQuote.author||"")}</strong>${design.pullQuote.role?`<span>${escapeHtml(design.pullQuote.role)}</span>`:""}</div></div>
     </div></section>` : "";
 
-  const tags = (cs.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join("");
+  const tags = (content.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join("");
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapeHtml(cs.title)}</title>
+<title>${escapeHtml(design.displayTitle||content.title)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
 <style>
 :root{--accent:${accent};--ink:#16181D;--body:#3A3F4A;--muted:#6B7280;--line:#E7E9ED;--bg:#FFFFFF;--soft:#F6F7F9;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Inter',system-ui,sans-serif;color:var(--body);background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased;}
 .wrap{max-width:940px;margin:0 auto;padding:0 clamp(20px,5vw,40px);}
-h1,h2,h3{font-family:${headFont};color:var(--ink);line-height:1.12;letter-spacing:-.02em;font-weight:600;}
-a{color:var(--accent);}
+h1,h2,h3{font-family:'Fraunces',Georgia,serif;color:var(--ink);line-height:1.12;letter-spacing:-.02em;font-weight:600;}
 /* hero */
-.hero{${heroBg}color:#fff;padding:clamp(70px,14vw,150px) 0 clamp(40px,7vw,70px);position:relative;}
+.hero{${heroBg}color:#fff;padding:clamp(72px,14vw,150px) 0 clamp(40px,7vw,72px);position:relative;}
 .hero .eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;opacity:.9;margin-bottom:16px;}
 .hero h1{color:#fff;font-size:clamp(34px,6vw,64px);max-width:16ch;margin-bottom:16px;}
 .hero .sub{font-size:clamp(16px,2vw,21px);max-width:52ch;opacity:.94;font-weight:400;}
+.hero-stat{display:inline-block;margin-top:32px;padding:14px 20px;border:1px solid rgba(255,255,255,.28);border-radius:12px;backdrop-filter:blur(4px);}
+.hs-v{font-family:'Fraunces',serif;font-size:34px;font-weight:600;line-height:1;}
+.hs-l{font-size:12.5px;opacity:.85;margin-top:5px;}
 /* meta */
 .meta{border-bottom:1px solid var(--line);}
-.meta .wrap{display:flex;flex-wrap:wrap;gap:22px 34px;padding-top:22px;padding-bottom:22px;align-items:center;}
-.meta .item{font-size:13px;}
+.meta .wrap{display:flex;flex-wrap:wrap;gap:22px 34px;padding:22px 0 22px;align-items:center;}
 .meta .k{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:3px;}
 .meta .v{font-weight:600;color:var(--ink);font-size:14px;}
 .tags{display:flex;flex-wrap:wrap;gap:7px;margin-left:auto;}
 .tag{font-size:11.5px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,#fff);border:1px solid color-mix(in srgb,var(--accent) 26%,#fff);padding:5px 11px;border-radius:100px;}
 /* overview */
 .overview{padding:clamp(44px,7vw,72px) 0 8px;}
-.overview p{font-family:${headFont};font-size:clamp(19px,2.4vw,26px);line-height:1.45;color:var(--ink);font-weight:500;}
+.overview p{font-family:'Fraunces',serif;font-size:clamp(19px,2.4vw,26px);line-height:1.45;color:var(--ink);font-weight:500;}
 /* metrics */
-.metrics{padding:clamp(38px,6vw,60px) 0;}
+.metrics{padding:clamp(36px,6vw,58px) 0;}
 .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:34px 0;}
 .metric{text-align:center;}
-.mv{font-family:${headFont};font-size:clamp(32px,4.5vw,48px);font-weight:600;color:var(--accent);line-height:1;}
+.mv{font-family:'Fraunces',serif;font-size:clamp(32px,4.5vw,48px);font-weight:600;color:var(--accent);line-height:1;}
 .ml{font-size:13px;color:var(--muted);margin-top:8px;font-weight:500;}
 /* sections */
-.section{padding:clamp(30px,5vw,52px) 0;}
-.s-inner{display:block;}
-.s-split .s-inner{display:grid;grid-template-columns:1fr 1fr;gap:clamp(28px,5vw,56px);align-items:center;}
-.s-split.rev .s-media{order:-1;}
-.s-solo .s-text{max-width:70ch;}
-.s-text h2{font-size:clamp(22px,3.2vw,32px);margin-bottom:16px;}
-.s-text p{margin-bottom:15px;font-size:16px;}
-.s-text ul{margin:0 0 15px 2px;padding-left:18px;}
-.s-text li{margin-bottom:8px;font-size:16px;}
+.section{padding:clamp(28px,4.5vw,46px) 0;}
+.section h2{font-size:clamp(22px,3.2vw,32px);margin-bottom:16px;}
+.s-body{max-width:72ch;}
+.s-body p{margin-bottom:15px;font-size:16px;}
+.s-body ul{margin:0 0 15px 2px;padding-left:18px;}
+.s-body li{margin-bottom:8px;font-size:16px;}
+.s-media{margin-top:26px;}
 .s-media img,.s-ph{width:100%;border-radius:16px;display:block;aspect-ratio:3/2;object-fit:cover;box-shadow:0 20px 50px -24px rgba(16,18,24,.4);}
-@media(max-width:720px){.s-split .s-inner{grid-template-columns:1fr;}.s-split.rev .s-media{order:0;}}
+.s-media figcaption{font-size:12.5px;color:var(--muted);margin-top:10px;}
 /* quote */
 .quote{padding:clamp(40px,6vw,64px) 0;background:var(--soft);}
-blockquote{font-family:${headFont};font-size:clamp(22px,3.4vw,34px);line-height:1.35;color:var(--ink);font-weight:500;max-width:24ch;}
+blockquote{font-family:'Fraunces',serif;font-size:clamp(22px,3.4vw,34px);line-height:1.35;color:var(--ink);font-weight:500;max-width:24ch;}
 .q-by{display:flex;align-items:center;gap:14px;margin-top:24px;}
 .q-bar{width:34px;height:3px;background:var(--accent);border-radius:3px;}
 .q-by strong{display:block;color:var(--ink);font-size:15px;}
 .q-by span{font-size:13px;color:var(--muted);}
-/* footer */
 footer{padding:40px 0 56px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;text-align:center;}
 </style></head>
 <body>
 <header class="hero"><div class="wrap">
-  ${cs.industry?`<div class="eyebrow">${escapeHtml(cs.industry)} · Case Study</div>`:`<div class="eyebrow">Case Study</div>`}
-  <h1>${escapeHtml(cs.title)}</h1>
-  ${cs.subtitle?`<p class="sub">${escapeHtml(cs.subtitle)}</p>`:""}
+  <div class="eyebrow">${escapeHtml(design.eyebrow||"Case Study")}</div>
+  <h1>${escapeHtml(design.displayTitle||content.title)}</h1>
+  ${design.displaySubtitle?`<p class="sub">${escapeHtml(design.displaySubtitle)}</p>`:""}
+  ${heroStat}
 </div></header>
 
 <section class="meta"><div class="wrap">
-  <div class="item"><div class="k">Client</div><div class="v">${escapeHtml(cs.client)}</div></div>
-  ${cs.industry?`<div class="item"><div class="k">Industry</div><div class="v">${escapeHtml(cs.industry)}</div></div>`:""}
+  <div class="item"><div class="k">Client</div><div class="v">${escapeHtml(content.client)}</div></div>
+  ${content.industry?`<div class="item"><div class="k">Industry</div><div class="v">${escapeHtml(content.industry)}</div></div>`:""}
   ${tags?`<div class="tags">${tags}</div>`:""}
 </div></section>
 
-${cs.overview?`<section class="overview"><div class="wrap"><p>${escapeHtml(cs.overview)}</p></div></section>`:""}
+${content.summary?`<section class="overview"><div class="wrap"><p>${escapeHtml(content.summary)}</p></div></section>`:""}
 ${metrics}
-${sections}
+${section("The challenge", content.challenge)}
+${section("Our approach", content.approach)}
+${section("The solution", content.solution, solutionMedia)}
+${section("The results", content.results)}
 ${quote}
-<footer><div class="wrap">Case study generated from raw notes · Designed &amp; illustrated automatically.</div></footer>
+<footer><div class="wrap">Written, designed, and illustrated automatically · one fixed format, one design system.</div></footer>
 </body></html>`;
-}
-
-// Darken/lighten a hex color for gradient depth. amt negative = darker.
-function shade(hex, amt){
-  const m = /^#([0-9a-f]{6})$/i.exec(hex); if(!m) return hex;
-  let n = parseInt(m[1],16);
-  let r = Math.max(0,Math.min(255,(n>>16)+amt));
-  let g = Math.max(0,Math.min(255,((n>>8)&255)+amt));
-  let b = Math.max(0,Math.min(255,(n&255)+amt));
-  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
 }
 
 // ---------- output actions ----------

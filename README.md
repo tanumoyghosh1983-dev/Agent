@@ -1,68 +1,81 @@
 # Case Study Agent
 
-Paste raw text — notes, an email thread, a transcript, bullet points — and the
-agent produces a **finished, designed, illustrated case study** you can preview
-and download as a single self-contained HTML file. End to end, powered by the
-**OpenAI API**.
+Paste raw text and get a **finished, illustrated case study** — where every
+case study comes out in **one fixed content format** and **one fixed design
+template**, so they're consistent every time. Preview it and download it as a
+single self-contained HTML file.
 
-It does four jobs, in order:
+It's a pipeline of specialized agents:
 
-1. **Writes** the story — turns messy input into a structured case study
-   (headline, overview, challenge → approach → solution → results, grounded
-   metrics, pull quote).
-2. **Art-directs** — picks an accent color, mood, and typeface that fit the
-   story, and writes prompts for the imagery.
-3. **Illustrates** — generates real images with OpenAI's image model and
-   embeds them directly in the page.
-4. **Designs** — lays it all out in a polished editorial template and gives you
-   a downloadable `.html` file.
+1. **Writer agent — OpenAI.** Turns raw input into content in ONE fixed format:
+   the same fields and the same four canonical sections (challenge → approach →
+   solution → results) every time. Makes no design decisions.
+2. **Design agent — Claude (Anthropic).** Takes that content and produces a
+   *design plan* for the ONE fixed template: the accent (chosen from an
+   approved 8-color palette), the display headline, which metric to feature,
+   art-direction prompts for the two image slots, and which quote to pull. It
+   makes design *judgments* but cannot change the template — that's what keeps
+   the design format consistent.
+3. **Illustrator agent — OpenAI images.** Renders the design agent's image
+   prompts, embedded as base64 (no image hosting, no broken links).
+4. **Renderer — deterministic.** Injects content + design plan + images into
+   the single fixed template. Same structure and typography every time; only
+   the accent, the copy, and the two images vary.
+
+## Why this shape
+
+Splitting *content* (fixed format) from *design* (fixed template) into separate
+agents is what enforces consistency. The writer can't drift the structure; the
+design agent can't drift the layout — it only picks from bounded, approved
+choices. Two very different inputs produce two case studies that look like they
+belong to the same collection.
 
 ## How it's structured
 
 ```
-public/index.html                     → the app (input, live preview, download)
+public/index.html                     → the app (input, staged pipeline, preview, download)
 netlify/functions/
-  generate-casestudy.js               → OpenAI chat: raw text → structured case study + theme + image prompts
-  generate-image.js                   → OpenAI images: one prompt → base64 image (embedded, no hosting needed)
+  generate-content.js                 → OpenAI writer: raw text → fixed-format content
+  design-casestudy.js                 → Claude design agent: content → design plan (one template)
+  generate-image.js                   → OpenAI images: prompt → embedded base64 image
 netlify.toml                          → Netlify config (static + functions)
 package.json                          → zero dependencies (uses fetch)
 ```
 
-The browser never sees the OpenAI key — it calls the site's own functions,
-which hold the key server-side. Generated images are returned as base64 and
-inlined into the HTML, so the file you download is completely self-contained
-(no broken image links, nothing to host).
+Both API keys stay server-side — the browser calls the site's own functions.
+The Anthropic Messages API is called with plain `fetch` (no SDK) to match this
+project's zero-dependency serverless-proxy convention.
 
 ## Deploy (Netlify)
 
 1. **Push this repo** and import it in Netlify ("Add new site" → "Import an
    existing project"). Settings auto-detect from `netlify.toml` — no build
-   command; it's static HTML plus two functions.
+   command; it's static HTML plus three functions.
 
 2. **Set environment variables** (Site configuration → Environment variables):
 
    | Variable | Required | Default | Purpose |
    |---|---|---|---|
-   | `OPENAI_API_KEY` | **Yes** | — | Your OpenAI API key. Used by both functions. |
-   | `OPENAI_MODEL` | No | `gpt-4o` | Text model that writes the case study. |
+   | `OPENAI_API_KEY` | **Yes** | — | Writer agent + illustrator agent. |
+   | `ANTHROPIC_API_KEY` | **Yes** | — | Design agent (Claude). |
+   | `OPENAI_MODEL` | No | `gpt-4o` | Text model for the writer. |
+   | `ANTHROPIC_MODEL` | No | `claude-opus-5` | Model for the design agent. |
    | `OPENAI_IMAGE_MODEL` | No | `gpt-image-1` | Image model. Set to `dall-e-3` if your account can't use `gpt-image-1`. |
    | `OPENAI_IMAGE_QUALITY` | No | `medium` | `low` \| `medium` \| `high` (gpt-image-1 only). Use `low` if your Netlify plan caps function runtime at 10s. |
 
 ## Notes on reliability
 
-- **Grounding:** the writer is instructed to use only facts, numbers, and
-  quotes that appear in your input. If there are no hard metrics, it returns
-  none rather than inventing them, and it omits the quote if the source has
-  none. Always give it real material to work from.
-- **Images never block the page.** They render in parallel while you already
-  see the designed layout; if an image fails or times out, that spot falls
-  back to a tasteful accent gradient instead of erroring.
-- **Timeouts:** image generation is the slow step. On plans that cap functions
-  at 10s, set `OPENAI_IMAGE_QUALITY=low`; on 26s plans, `medium` is fine.
-
-## Local input tips
-
-The richer the raw text, the better the result. Client name, the problem, what
-you did, and concrete outcomes (with numbers, if you have them) give the agent
-everything it needs. Try the **Use sample** button to see the shape of a good
-input.
+- **Consistency is enforced in code, not just prompts.** The writer's output is
+  normalized to the fixed schema; the design agent's output is clamped to the
+  approved palette, and its metrics and pull quote can only reference facts that
+  exist in the content — so a case study can never show a fabricated number or a
+  hallucinated colour.
+- **No fabrication.** The writer uses only facts, numbers, and quotes present in
+  your input; if there are no hard metrics it returns none, and it omits the
+  quote when the source has none. Feed it real material.
+- **Images never block the page.** They render in parallel while you already see
+  the designed layout; a failed or slow image falls back to a tasteful accent
+  gradient instead of erroring.
+- **Serverless timeouts.** Image generation is the slow step; on plans that cap
+  functions at 10s, set `OPENAI_IMAGE_QUALITY=low`. The design agent runs Claude
+  at low effort to stay well inside the function window.
