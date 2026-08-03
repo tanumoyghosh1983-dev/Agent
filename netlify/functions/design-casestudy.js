@@ -1,53 +1,54 @@
 // Netlify Function: design-casestudy.js
-// The "design" agent, powered by Claude (Anthropic Messages API). It receives
-// the fixed-format content from the writer agent and produces a DESIGN PLAN:
-// the bounded set of decisions that a designer makes when placing content into
-// ONE fixed template — the accent color (from an approved palette), the
-// display headline, which single metric to feature, the art direction for the
-// two fixed image slots, and which quote to pull.
-//
-// The template itself is fixed and lives in the renderer; the design agent
-// does not emit HTML or CSS. That is what guarantees every case study comes
-// out in the same design format while still getting real, content-aware
-// design judgment.
+// The "design" agent, powered by Claude (Anthropic Messages API). The page
+// template is now fully fixed — layout, typography, and the black/white/teal
+// brand system all live in public/index.html and never change. What's left
+// for a design agent to actually decide, within that fixed template, is art
+// direction: which icon (from a fixed icon set) best represents each card,
+// and what the supporting photography/imagery should depict.
 //
 // Uses raw HTTPS against the Anthropic Messages API to match this project's
 // zero-dependency serverless-proxy convention. Key is server-side only
 // (ANTHROPIC_API_KEY). Model defaults to claude-opus-5.
 
-// The approved accent palette. The design agent may ONLY choose one of these
-// keys — the renderer maps the key to a hex value. Fixing the palette is part
-// of "one design format": the accent adapts to the story, the system does not.
-const PALETTE = ["indigo", "teal", "crimson", "amber", "forest", "slate", "plum", "rust"];
+// The fixed icon set. The design agent may ONLY choose from these keys — the
+// renderer owns the actual SVG for each. This is what keeps "one fixed
+// template" true even though icon choice still requires real judgment.
+const ICONS = [
+  "mobile", "ai", "content", "sound", "check", "reward", "social", "battle",
+  "network", "web", "cloud", "security", "time", "growth", "users", "settings",
+  "idea", "target", "integration", "data", "payment", "support", "automation", "design",
+];
 
-const SYSTEM_PROMPT = `You are a senior art director. A case study will always be rendered into ONE fixed template with a fixed layout and fixed typography: a hero (eyebrow, big headline, subtitle, and one hero image), a client/industry/tags meta bar, an overview lede, a metrics band, four fixed sections in order (The challenge, Our approach, The solution, The results) with one image inside the solution section, a pull-quote band, and a footer.
+const SYSTEM_PROMPT = `You are a senior art director working inside ONE fixed page template that never changes — fixed layout, fixed typography, fixed black/white/teal brand colors. You do NOT write HTML, CSS, or copy, and you cannot change the layout. Your job is only the two bounded creative decisions the template still needs: which icon best represents each card, and what the supporting imagery should depict.
 
-You do NOT write HTML, CSS, or layout — the template is fixed. Your job is only the bounded design decisions that adapt this specific story to that template. Respond with ONLY valid JSON (no markdown fences, no preamble) in exactly this shape:
+You will be given the case study's content JSON (title, features array, results array, project/challenge text, etc). Respond with ONLY valid JSON (no markdown fences, no preamble) in exactly this shape:
 {
-  "accent": "one of: indigo, teal, crimson, amber, forest, slate, plum, rust — choose the one that best fits the story's industry and mood",
-  "eyebrow": "a short kicker for above the headline, e.g. 'Logistics · Case Study' (<= 6 words)",
-  "displayTitle": "the headline to show, refined to fit a hero (<= 8 words)",
-  "displaySubtitle": "one supporting line under the headline",
-  "heroMetric": {"value": "the single most striking metric", "label": "what it measures"},
-  "metrics": [ {"value": "...", "label": "..."} ],
-  "heroImage": {
-    "prompt": "a vivid, detailed art-direction prompt for the HERO image — photographic or richly conceptual, tied to the story. Describe imagery ONLY: no text, letters, words, logos, charts, or UI (image models render those badly).",
-    "caption": "a short caption for the hero image"
+  "icons": {
+    "project": "one icon key",
+    "challenge": "one icon key",
+    "features": ["one icon key per item in content.features, same order, same length"],
+    "results": ["one icon key per item in content.results, same order, same length"]
   },
-  "midImage": {
-    "prompt": "art-direction prompt for the image inside the solution section — same rules as the hero image (imagery only, no text).",
-    "caption": "a short caption for this image"
-  },
-  "pullQuote": {"text": "...", "author": "...", "role": "..."}
+  "images": {
+    "hero": {"prompt": "a vivid, detailed art-direction prompt for a wide hero photo tied to this story's setting/industry"},
+    "secondary": {"prompt": "a supporting image prompt, a different angle or moment from the same setting"},
+    "solutionScreens": [
+      {"prompt": "art-direction prompt for a phone-screen-shaped image depicting the product/app/interface described in the solution, screen 1"},
+      {"prompt": "screen 2, a different screen or state of the same product"}
+    ]
+  }
 }
 
+ALLOWED ICON KEYS (choose only from this list, exactly as spelled):
+${ICONS.join(", ")}
+
 RULES:
-- "accent" MUST be exactly one of the eight allowed keys. Do not invent a color or a hex value.
-- Choose "heroMetric" and up to 3 "metrics" ONLY from the metrics present in the content. If the content has no metrics, set "heroMetric": null and "metrics": []. Never invent numbers.
-- "displayTitle" and "displaySubtitle" should be tightened versions of the content's title/subtitle that read well large — do not introduce new claims.
-- Set "pullQuote" from the content's quote if one exists; if the content has no quote, set "pullQuote": null. Never fabricate a quote or an attribution.
-- Image prompts describe visuals ONLY. Never request text, words, labels, logos, charts, or screens with text in an image.
-- Keep every string tight. No marketing clichés.
+- Every icon value MUST be exactly one of the allowed keys above. Pick the closest conceptual match for each card's title/description.
+- "solutionScreens": provide 2 to 4 entries, matching how many distinct product screens or states the solution paragraph implies (default to 3 if unclear).
+- Image prompts describe visuals ONLY — no text, words, letters, logos, charts, or UI text baked into the image (image models render text badly).
+- CRITICAL: never depict a specific named real person's likeness. If the content names a real client, employee, or quote author, do NOT prompt for a photo of "them" — describe generic, unnamed people, settings, devices, or scenes appropriate to the story instead (e.g. "a bright classroom with students using tablets", not "a photo of [name]").
+- "hero" and "secondary" should feel like real environmental/contextual photography suited to the industry, not generic stock-photo clichés.
+- "solutionScreens" prompts should describe a mobile app or product screen's visual composition (colors, layout mood, imagery within it) — not literal text or labels, since those can't be rendered reliably.
 
 Output ONLY the JSON object.`;
 
@@ -61,18 +62,17 @@ async function callClaude(apiKey, model, contentJSON) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 6000,
-      // Low effort keeps this fast enough for a serverless function while still
-      // giving Claude room to reason. Adaptive thinking is on by default on
-      // claude-opus-5 (we omit the `thinking` field), which suits design
-      // judgment; max_tokens covers thinking + the small JSON output.
+      max_tokens: 4000,
+      // Adaptive thinking is on by default on claude-opus-5 (we omit `thinking`);
+      // low effort is plenty for bounded icon-picking + art direction and keeps
+      // this comfortably inside a serverless function's time budget.
       output_config: { effort: "low" },
       system: SYSTEM_PROMPT,
       messages: [
         {
           role: "user",
           content:
-            "Here is the fixed-format case study content. Produce the design plan JSON:\n\n" +
+            "Here is the fixed-format case study content. Produce the art direction JSON:\n\n" +
             contentJSON,
         },
       ],
@@ -117,54 +117,42 @@ function parseJSON(raw) {
   }
 }
 
-// Constrains the design plan to safe, in-template values so the renderer never
-// receives an out-of-palette color or a hallucinated metric/quote.
+const FALLBACK_ICON = "check";
+const okIcon = (k) => (ICONS.includes(k) ? k : FALLBACK_ICON);
+
+// Clamps the plan to safe, in-system values: every icon must be from the
+// fixed set, and icon arrays are padded/truncated to match the content
+// arrays exactly so the renderer never runs out of icons mid-grid.
 function normalize(plan, content) {
   const str = (v, n) => String(v == null ? "" : v).slice(0, n);
-  const contentMetricLabels = new Set((content.metrics || []).map((m) => m.label));
-  const pickMetric = (m) =>
-    m && m.value && m.label ? { value: str(m.value, 20), label: str(m.label, 60) } : null;
 
-  const out = {
-    accent: PALETTE.includes(plan.accent) ? plan.accent : "indigo",
-    eyebrow: str(plan.eyebrow || (content.industry ? content.industry + " · Case Study" : "Case Study"), 60),
-    displayTitle: str(plan.displayTitle || content.title, 160),
-    displaySubtitle: str(plan.displaySubtitle || content.subtitle, 300),
-    heroMetric: null,
-    metrics: [],
-    heroImage: {
-      prompt: str(plan.heroImage?.prompt, 800),
-      caption: str(plan.heroImage?.caption, 160),
-    },
-    midImage: {
-      prompt: str(plan.midImage?.prompt, 800),
-      caption: str(plan.midImage?.caption, 160),
-    },
-    pullQuote: null,
+  const matchIcons = (arr, len) => {
+    const list = Array.isArray(arr) ? arr.map(okIcon) : [];
+    while (list.length < len) list.push(FALLBACK_ICON);
+    return list.slice(0, len);
   };
 
-  // Metrics may only reference metrics that actually exist in the content.
-  if ((content.metrics || []).length) {
-    const hero = pickMetric(plan.heroMetric);
-    if (hero && contentMetricLabels.has(hero.label)) out.heroMetric = hero;
-    out.metrics = (Array.isArray(plan.metrics) ? plan.metrics : [])
-      .map(pickMetric)
-      .filter((m) => m && contentMetricLabels.has(m.label))
-      .slice(0, 3);
-    // Fall back to the content's own metrics if the plan dropped them.
-    if (!out.heroMetric && content.metrics[0]) out.heroMetric = content.metrics[0];
-    if (out.metrics.length === 0) out.metrics = content.metrics.slice(0, 3);
+  const solutionScreens = (Array.isArray(plan.images?.solutionScreens) ? plan.images.solutionScreens : [])
+    .slice(0, 4)
+    .map((s) => ({ prompt: str(s?.prompt, 700) }))
+    .filter((s) => s.prompt);
+  while (solutionScreens.length < 2 && plan.images?.solutionScreens) {
+    solutionScreens.push({ prompt: str(plan.images.solutionScreens[0]?.prompt, 700) || "a modern mobile app interface" });
   }
 
-  // A pull quote may only come from the content's real quote.
-  if (content.quote && content.quote.text) {
-    out.pullQuote = {
-      text: str(content.quote.text, 500),
-      author: str(content.quote.author, 80),
-      role: str(content.quote.role, 120),
-    };
-  }
-  return out;
+  return {
+    icons: {
+      project: okIcon(plan.icons?.project),
+      challenge: okIcon(plan.icons?.challenge),
+      features: matchIcons(plan.icons?.features, (content.features || []).length),
+      results: matchIcons(plan.icons?.results, (content.results || []).length),
+    },
+    images: {
+      hero: { prompt: str(plan.images?.hero?.prompt, 700) },
+      secondary: { prompt: str(plan.images?.secondary?.prompt, 700) },
+      solutionScreens: solutionScreens.length ? solutionScreens : [{ prompt: "a clean modern mobile app interface, abstract UI composition" }],
+    },
+  };
 }
 
 exports.handler = async function (event) {
@@ -203,7 +191,7 @@ exports.handler = async function (event) {
 
   try {
     const plan = parseJSON(await callClaude(apiKey, model, JSON.stringify(content)));
-    if (!plan) throw new Error("The design plan didn't come through cleanly. Please try again.");
+    if (!plan) throw new Error("The art direction didn't come through cleanly. Please try again.");
     return {
       statusCode: 200,
       headers: { ...headers, "Content-Type": "application/json" },
@@ -218,4 +206,4 @@ exports.handler = async function (event) {
   }
 };
 
-module.exports.PALETTE = PALETTE;
+module.exports.ICONS = ICONS;

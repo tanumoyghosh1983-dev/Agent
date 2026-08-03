@@ -1,42 +1,66 @@
 # Case Study Agent
 
-Paste raw text and get a **finished, illustrated case study** — where every
-case study comes out in **one fixed content format** and **one fixed design
-template**, so they're consistent every time. Preview it and download it as a
-single self-contained HTML file.
+Paste raw text and get a **finished, illustrated case study**, rendered into
+**one fixed page template** — the exact structure and design approved in
+Figma — every time. Preview it and download it as a single self-contained
+HTML file.
 
 It's a pipeline of specialized agents:
 
-1. **Writer agent — OpenAI.** Turns raw input into content in ONE fixed format:
-   the same fields and the same four canonical sections (challenge → approach →
-   solution → results) every time. Makes no design decisions.
-2. **Design agent — Claude (Anthropic).** Takes that content and produces a
-   *design plan* for the ONE fixed template: the accent (chosen from an
-   approved 8-color palette), the display headline, which metric to feature,
-   art-direction prompts for the two image slots, and which quote to pull. It
-   makes design *judgments* but cannot change the template — that's what keeps
-   the design format consistent.
+1. **Writer agent — OpenAI.** Turns raw input into content in ONE fixed
+   format: headline, meta line, quick snapshot, story section, project/
+   challenge cards, solution summary, a feature grid, a results grid, an
+   optional tech-stack table, an optional testimonial, and a closing CTA —
+   the same slots every time, filled from your source text.
+2. **Design agent — Claude (Anthropic).** The page layout, typography, and
+   black/white/teal brand system are fixed in the template and never change.
+   What Claude decides, within that fixed template, is art direction: which
+   icon (from a fixed 24-icon set) best represents each card, and what the
+   supporting photography and product-screen imagery should depict.
 3. **Illustrator agent — OpenAI images.** Renders the design agent's image
-   prompts, embedded as base64 (no image hosting, no broken links).
-4. **Renderer — deterministic.** Injects content + design plan + images into
-   the single fixed template. Same structure and typography every time; only
-   the accent, the copy, and the two images vary.
+   prompts — hero photo, a secondary supporting image, and 2-4 solution
+   screens — embedded as base64 (no image hosting, no broken links).
+4. **Renderer — deterministic.** Injects content + icon choices + images into
+   the single fixed template. Structure, layout, and colors never vary
+   between case studies — only the copy, the icon choices, and the images do.
 
 ## Why this shape
 
-Splitting *content* (fixed format) from *design* (fixed template) into separate
-agents is what enforces consistency. The writer can't drift the structure; the
-design agent can't drift the layout — it only picks from bounded, approved
-choices. Two very different inputs produce two case studies that look like they
-belong to the same collection.
+Splitting *content* (fixed format) from *design* (fixed template) into
+separate agents is what enforces consistency. The writer can't drift the
+structure; the design agent can't touch layout, color, or type — it only
+picks from a bounded, approved icon set and writes image prompts. Two very
+different inputs still produce two case studies that look like they came out
+of the same design system.
+
+## Deliberate deviations from the source design
+
+A few elements in the approved Figma couldn't be carried over faithfully
+without breaking the tool's grounding guarantees, so they were adapted:
+
+- **The 5-tab feature switcher** renders as one static feature grid (2-4
+  items). Populating 5 real, distinct tab categories from a single raw-text
+  input would mean inventing content that isn't in the source.
+- **The "Other Case Studies" cross-link section** is dropped. There's no
+  library of other generated case studies to link to, and nothing should be
+  fabricated to fill that space.
+- **The testimonial photo is an initials avatar, not an AI-generated face.**
+  Generating a photorealistic image of a specific named real person (the
+  quote's author) would fabricate that person's likeness. The design agent is
+  explicitly instructed never to prompt for a named individual's photo.
+- **The tech-stack table only renders when the source names real
+  technologies.** No guessed stack, ever — same grounding rule already
+  applied to metrics and quotes.
 
 ## How it's structured
 
 ```
-public/index.html                     → the app (input, staged pipeline, preview, download)
+public/index.html                     → the app (input, 4-stage pipeline, preview, download)
+                                         includes the fixed template's HTML/CSS and the
+                                         24-icon inline SVG library
 netlify/functions/
   generate-content.js                 → OpenAI writer: raw text → fixed-format content
-  design-casestudy.js                 → Claude design agent: content → design plan (one template)
+  design-casestudy.js                 → Claude design agent: content → icon + image art direction
   generate-image.js                   → OpenAI images: prompt → embedded base64 image
 netlify.toml                          → Netlify config (static + functions)
 package.json                          → zero dependencies (uses fetch)
@@ -65,17 +89,19 @@ project's zero-dependency serverless-proxy convention.
 
 ## Notes on reliability
 
-- **Consistency is enforced in code, not just prompts.** The writer's output is
-  normalized to the fixed schema; the design agent's output is clamped to the
-  approved palette, and its metrics and pull quote can only reference facts that
-  exist in the content — so a case study can never show a fabricated number or a
-  hallucinated colour.
-- **No fabrication.** The writer uses only facts, numbers, and quotes present in
-  your input; if there are no hard metrics it returns none, and it omits the
-  quote when the source has none. Feed it real material.
-- **Images never block the page.** They render in parallel while you already see
-  the designed layout; a failed or slow image falls back to a tasteful accent
-  gradient instead of erroring.
-- **Serverless timeouts.** Image generation is the slow step; on plans that cap
-  functions at 10s, set `OPENAI_IMAGE_QUALITY=low`. The design agent runs Claude
-  at low effort to stay well inside the function window.
+- **Consistency is enforced in code, not just prompts.** The writer's output
+  is normalized to the fixed schema (array lengths clamped, required pairs
+  filtered). The design agent's icon choices are clamped to the fixed
+  24-key set and padded/truncated to match each content array's length
+  exactly — a bad or missing icon key can never leak into the render.
+- **No fabrication.** The writer uses only facts, numbers, technologies, and
+  quotes present in your input. If there's no named tech stack, the tools
+  table is omitted; if there's no real quote, the testimonial is omitted.
+  Feed it real material.
+- **Images never block the page.** They render in parallel while you already
+  see the full layout; a failed or slow image falls back to a tasteful
+  placeholder instead of erroring.
+- **Serverless timeouts.** A run generates up to 6 images (hero, secondary,
+  2-4 solution screens) — the slow step. On plans that cap functions at 10s,
+  set `OPENAI_IMAGE_QUALITY=low`. The design agent runs Claude at low effort
+  to stay comfortably inside the function window.
