@@ -51,6 +51,21 @@ without breaking the tool's grounding guarantees, so they were adapted:
 - **The tech-stack table only renders when the source names real
   technologies.** No guessed stack, ever — same grounding rule already
   applied to metrics and quotes.
+- **Slider dots under the story image row are static, not a working
+  carousel.** The source design uses a real slider component there; this
+  renders the same visual dots without the interactivity, since a one-shot
+  generated page doesn't have more than the two images to cycle through.
+
+## Values pulled directly from the Figma file (confirmed, not estimated)
+
+Read from the file's Design panel: 100px section padding, 24px corner radius
+on cards, 48px gap in the solution-screens row, and a pure `#000000` hero
+background — all baked into the template as exact values. Two things are
+still a best-effort visual match rather than confirmed values: the **teal
+accent hex** and the **font family** (defaulted to Inter). Both are set once,
+as CSS custom properties / a single `<link>` tag near the top of
+`buildHTML()` in `public/index.html` — swap them there if you get the real
+values later.
 
 ## How it's structured
 
