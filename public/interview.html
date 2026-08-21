@@ -100,11 +100,30 @@ Outcome and impact for the client</textarea>
     <div class="status" id="saveStatus"></div>
     <div class="toolbar">
       <button class="btn-primary" id="downloadBtn">Download transcript (.json)</button>
-      <button class="btn-secondary" id="genDocBtn">Generate documentation draft</button>
+      <button class="btn-secondary" id="genCleanBtn">Clean up transcript</button>
+      <button class="btn-secondary" id="genDocBtn">Generate full documentation draft</button>
     </div>
     <div id="docOutput" class="hidden" style="margin-top:16px;"></div>
     <div class="toolbar hidden" id="docToolbar">
-      <button class="btn-secondary" id="downloadDocBtn">Download draft (.md)</button>
+      <button class="btn-secondary" id="downloadDocBtn">Download this version (.md)</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 style="font-size:16px; margin-top:0;">Find a past session</h2>
+    <div class="sub" style="margin-bottom:12px;">Every finished session is saved automatically. Look one up by its session ID (shown after you finish an interview) to re-download its transcript or generated docs.</div>
+    <div class="row">
+      <div>
+        <input type="text" id="lookupId" placeholder="Session ID, e.g. 1719000000000-ab12cd" />
+      </div>
+      <div style="flex:0 0 auto;">
+        <button class="btn-secondary" id="lookupBtn">Look up</button>
+      </div>
+    </div>
+    <div class="status" id="lookupStatus"></div>
+    <div id="lookupResult" class="hidden" style="margin-top:14px;">
+      <div id="lookupMeta" style="font-size:14px; margin-bottom:10px;"></div>
+      <div class="toolbar" id="lookupToolbar"></div>
     </div>
   </div>
 </div>
@@ -402,26 +421,78 @@ $("downloadBtn").addEventListener("click", () => {
   downloadFile(`interview-${slug(state.project)}-${Date.now()}.json`, JSON.stringify(payload, null, 2), "application/json");
 });
 
-$("genDocBtn").addEventListener("click", async () => {
+async function generateDoc(mode) {
   const out = $("docOutput");
   out.classList.remove("hidden");
-  out.textContent = "Generating documentation draft…";
+  out.textContent = mode === "clean" ? "Cleaning up the transcript…" : "Generating documentation draft…";
   try {
     const data = await fetchJSON("/.netlify/functions/generate-doc", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa }),
+      body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa, mode, sessionId: state.sessionId || null }),
     });
     out.textContent = data.markdown;
     state.docMarkdown = data.markdown;
+    state.docMode = mode;
     $("docToolbar").classList.remove("hidden");
   } catch (err) {
-    out.textContent = "Failed to generate documentation: " + err.message;
+    out.textContent = "Failed to generate: " + err.message;
   }
-});
+}
+
+$("genCleanBtn").addEventListener("click", () => generateDoc("clean"));
+$("genDocBtn").addEventListener("click", () => generateDoc("full"));
 
 $("downloadDocBtn").addEventListener("click", () => {
-  downloadFile(`doc-${slug(state.project)}-${Date.now()}.md`, state.docMarkdown || "", "text/markdown");
+  const suffix = state.docMode === "clean" ? "clean" : "doc";
+  downloadFile(`${suffix}-${slug(state.project)}-${Date.now()}.md`, state.docMarkdown || "", "text/markdown");
+});
+
+// --- Look up a past session by ID (saved automatically at Finish) ---
+$("lookupBtn").addEventListener("click", async () => {
+  const id = $("lookupId").value.trim();
+  const statusEl = $("lookupStatus");
+  const resultEl = $("lookupResult");
+  resultEl.classList.add("hidden");
+  if (!id) { setStatus(statusEl, "Enter a session ID.", true); return; }
+  setStatus(statusEl, "Looking up…");
+  try {
+    const record = await fetchJSON(`/.netlify/functions/list-sessions?id=${encodeURIComponent(id)}`);
+    setStatus(statusEl, "");
+    $("lookupMeta").textContent = `${record.expert} — ${record.project} (${new Date(record.createdAt).toLocaleString()}), ${record.qa.length} answers`;
+    const toolbar = $("lookupToolbar");
+    toolbar.innerHTML = "";
+
+    const addBtn = (label, onClick) => {
+      const b = document.createElement("button");
+      b.className = "btn-secondary";
+      b.textContent = label;
+      b.addEventListener("click", onClick);
+      toolbar.appendChild(b);
+    };
+
+    addBtn("Download transcript (.json)", () => {
+      downloadFile(`interview-${slug(record.project)}-${record.id}.json`, JSON.stringify(record, null, 2), "application/json");
+    });
+    addBtn("Fetch clean transcript (.md)", async () => {
+      try {
+        const res = await fetch(`/.netlify/functions/list-sessions?id=${encodeURIComponent(id)}&doc=clean`);
+        if (!res.ok) throw new Error((await res.json()).error || "Not found — generate it first from a live session, or it hasn't been made yet.");
+        downloadFile(`clean-${slug(record.project)}-${record.id}.md`, await res.text(), "text/markdown");
+      } catch (err) { setStatus(statusEl, err.message, true); }
+    });
+    addBtn("Fetch full doc (.md)", async () => {
+      try {
+        const res = await fetch(`/.netlify/functions/list-sessions?id=${encodeURIComponent(id)}&doc=full`);
+        if (!res.ok) throw new Error((await res.json()).error || "Not found — generate it first from a live session, or it hasn't been made yet.");
+        downloadFile(`doc-${slug(record.project)}-${record.id}.md`, await res.text(), "text/markdown");
+      } catch (err) { setStatus(statusEl, err.message, true); }
+    });
+
+    resultEl.classList.remove("hidden");
+  } catch (err) {
+    setStatus(statusEl, err.message, true);
+  }
 });
 
 function downloadFile(filename, content, type) {

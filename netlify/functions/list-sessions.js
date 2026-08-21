@@ -3,6 +3,7 @@
 // and re-open a transcript later. GET /list-sessions -> [{id, expert, project, createdAt}]
 // GET /list-sessions?id=<id> -> full session record (transcript + audio keys)
 // GET /list-sessions?id=<id>&audio=<audioKey> -> raw audio bytes, base64 JSON
+// GET /list-sessions?id=<id>&doc=clean|full -> that session's saved doc (text/markdown), if generated
 
 const { getStore } = require("@netlify/blobs");
 
@@ -20,6 +21,13 @@ exports.handler = async function (event) {
   try {
     const store = getStore("interview-sessions");
     const params = event.queryStringParameters || {};
+
+    if (params.id && params.doc) {
+      const mode = params.doc === "clean" ? "clean" : "full";
+      const markdown = await store.get(`${params.id}-doc-${mode}.md`, { type: "text" });
+      if (!markdown) return { statusCode: 404, headers, body: JSON.stringify({ error: "No saved doc of that type for this session yet." }) };
+      return { statusCode: 200, headers: { ...headers, "Content-Type": "text/markdown" }, body: markdown };
+    }
 
     if (params.id && params.audio) {
       const blob = await store.get(params.audio, { type: "arrayBuffer" });
