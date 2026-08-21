@@ -13,7 +13,9 @@
   .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
   label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-  input[type=text], textarea { width:100%; background:#0f0f11; border:1px solid var(--border); border-radius:8px; color:var(--text); padding:10px 12px; font-size:14px; font-family:inherit; }
+  input[type=text], textarea, select { width:100%; background:#0f0f11; border:1px solid var(--border); border-radius:8px; color:var(--text); padding:10px 12px; font-size:14px; font-family:inherit; }
+  label.checkbox { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); cursor:pointer; }
+  label.checkbox input { width:auto; margin:0; }
   textarea { min-height: 90px; resize: vertical; }
   .row { display:flex; gap:12px; }
   .row > div { flex:1; }
@@ -53,6 +55,13 @@
         <label for="projectName">Client project name</label>
         <input type="text" id="projectName" placeholder="e.g. Acme Logistics Platform" />
       </div>
+    </div>
+    <div style="margin-top:14px;">
+      <label for="language">Language the expert will speak</label>
+      <select id="language">
+        <option value="en">English</option>
+        <option value="hi">Hindi (हिन्दी)</option>
+      </select>
     </div>
     <div class="sub" style="margin:14px 0 0;">Runs through a fixed 24-question interview framework covering client context, the problem, what things looked like before, complexity, the solution, technical decisions, and impact — in whatever order fits the conversation, skipping anything already answered.</div>
     <div style="margin-top:14px;">
@@ -101,6 +110,10 @@
       <button class="btn-secondary" id="genCleanBtn">Clean up transcript</button>
       <button class="btn-secondary" id="genDocBtn">Generate full documentation draft</button>
     </div>
+    <label class="checkbox hidden" id="translateRow" style="margin-top:10px;">
+      <input type="checkbox" id="translateCheckbox" />
+      Translate the generated doc into English
+    </label>
     <div id="docOutput" class="hidden" style="margin-top:16px;"></div>
     <div class="toolbar hidden" id="docToolbar">
       <button class="btn-secondary" id="downloadDocBtn">Download this version (.md)</button>
@@ -129,7 +142,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const state = {
-  expert: "", project: "", extraTopics: [],
+  expert: "", project: "", extraTopics: [], language: "en",
   history: [], // {topic, question, answerText}
   qa: [],       // full records incl. audioBase64/mimeType, for saving
   currentQuestion: null,
@@ -187,7 +200,7 @@ async function askNextQuestion() {
     const data = await fetchJSON("/.netlify/functions/interview-next-question", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extraTopics: state.extraTopics, history: state.history }),
+      body: JSON.stringify({ extraTopics: state.extraTopics, history: state.history, language: state.language }),
     });
     if (!state.active) return; // Finish was clicked while this request was in flight
     if (data.done) {
@@ -215,6 +228,15 @@ function speakQuestion(text) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.05;
+    if (state.language === "hi") {
+      u.lang = "hi-IN";
+      // Prefer an actual Hindi voice if the browser/OS has one installed;
+      // otherwise fall back to the system default voice reading Devanagari
+      // text as best it can (works, just may sound off).
+      const voices = window.speechSynthesis.getVoices();
+      const hiVoice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("hi"));
+      if (hiVoice) u.voice = hiVoice;
+    }
     // While the question is being read aloud, ignore mic volume for
     // silence-detection purposes (without headphones the mic can otherwise
     // pick up the question itself and misfire the "done speaking" check) —
@@ -230,10 +252,12 @@ $("startBtn").addEventListener("click", () => {
   state.expert = $("expertName").value.trim();
   state.project = $("projectName").value.trim();
   state.extraTopics = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  state.language = $("language").value === "hi" ? "hi" : "en";
   if (!state.expert || !state.project) { setStatus($("setupStatus"), "Please fill in expert name and project name.", true); return; }
   state.active = true;
   $("setupPanel").classList.add("hidden");
   $("interviewPanel").classList.remove("hidden");
+  if (state.language === "hi") $("translateRow").classList.remove("hidden");
   askNextQuestion();
 });
 
@@ -325,7 +349,7 @@ async function onRecordingStop() {
     const data = await fetchJSON("/.netlify/functions/transcribe-answer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioBase64, mimeType }),
+      body: JSON.stringify({ audioBase64, mimeType, language: state.language }),
     });
     if (!state.active) return;
     $("answerText").value = data.text || "";
@@ -443,7 +467,14 @@ async function generateDoc(mode) {
     const data = await fetchJSON("/.netlify/functions/generate-doc", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa, mode, sessionId: state.sessionId || null }),
+      body: JSON.stringify({
+        expert: state.expert,
+        project: state.project,
+        qa: state.qa,
+        mode,
+        sessionId: state.sessionId || null,
+        translateToEnglish: $("translateCheckbox").checked,
+      }),
     });
     out.textContent = data.markdown;
     state.docMarkdown = data.markdown;

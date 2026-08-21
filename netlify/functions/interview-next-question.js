@@ -81,7 +81,12 @@ HARD RULES:
 
 Output ONLY the JSON object.`;
 
-async function callClaude(apiKey, model, extraTopics, history) {
+const LANGUAGE_ADDENDUM = {
+  hi: `\n\nLANGUAGE: The expert is more comfortable speaking Hindi. Write the "question" field entirely in Hindi (Devanagari script), in a natural, conversational, spoken register - not textbook-formal Hindi. It's completely normal and expected to keep English loanwords/technical terms as-is where that's how people actually talk (e.g. "app", "database", "client", tool and technology names) rather than forcing an awkward pure-Sanskrit translation for them. The "topic"/stage field can stay in English (it's just an internal label, never shown as a question).`,
+};
+
+async function callClaude(apiKey, model, extraTopics, history, language) {
+  const systemPrompt = SYSTEM_PROMPT + (LANGUAGE_ADDENDUM[language] || "");
   const userPayload = JSON.stringify({ questionBank: QUESTION_BANK, extraTopics, history }, null, 2);
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -98,7 +103,7 @@ async function callClaude(apiKey, model, extraTopics, history) {
       // which caused repeat/redundant questions. "medium" costs a bit more
       // latency per question but actually reasons about what's known.
       output_config: { effort: "medium" },
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [
         {
           role: "user",
@@ -164,7 +169,7 @@ exports.handler = async function (event) {
     };
   }
 
-  let extraTopics, history;
+  let extraTopics, history, language;
   try {
     const body = JSON.parse(event.body || "{}");
     // "outline" is accepted as the field name for backward compatibility
@@ -180,6 +185,7 @@ exports.handler = async function (event) {
           answer: String(h.answerText || h.answer || "").slice(0, 4000),
         }))
       : [];
+    language = body.language === "hi" ? "hi" : "en";
   } catch (e) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid request body" }) };
   }
@@ -187,7 +193,7 @@ exports.handler = async function (event) {
   const model = process.env.ANTHROPIC_MODEL || "claude-opus-5";
 
   try {
-    const plan = parseJSON(await callClaude(apiKey, model, extraTopics, history));
+    const plan = parseJSON(await callClaude(apiKey, model, extraTopics, history, language));
     if (!plan) throw new Error("The interviewer response didn't come through cleanly. Please try again.");
     const out = plan.done
       ? { done: true }

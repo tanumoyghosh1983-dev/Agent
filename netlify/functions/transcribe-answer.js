@@ -26,11 +26,15 @@ exports.handler = async function (event) {
     };
   }
 
-  let audioBase64, mimeType;
+  let audioBase64, mimeType, language;
   try {
     const body = JSON.parse(event.body || "{}");
     audioBase64 = body.audioBase64;
     mimeType = String(body.mimeType || "audio/webm");
+    // ISO-639-1 hint (e.g. "hi" for Hindi) — Whisper auto-detects language
+    // fine on its own, but a hint measurably improves accuracy, especially
+    // with code-mixed speech (Hindi with English technical terms).
+    language = body.language ? String(body.language).slice(0, 10) : null;
   } catch (e) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid request body" }) };
   }
@@ -57,6 +61,9 @@ exports.handler = async function (event) {
     const boundary = "----ffmnetlifyboundary" + Date.now();
     const parts = [];
     parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\n${model}\r\n`));
+    if (language) {
+      parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n${language}\r\n`));
+    }
     parts.push(
       Buffer.from(
         `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="answer.${ext}"\r\nContent-Type: ${mimeType}\r\n\r\n`

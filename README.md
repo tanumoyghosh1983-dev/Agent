@@ -138,6 +138,15 @@ transcript into an organized Markdown documentation draft.
 
 **Open `public/interview.html`** (e.g. `https://your-site.netlify.app/interview.html`).
 
+Works in **English or Hindi** — pick the expert's language on the setup
+screen. In Hindi mode: Claude asks its questions in natural spoken Hindi
+(keeping English technical terms as-is, the way people actually talk),
+Whisper is given a language hint for better transcription accuracy, and the
+browser reads questions aloud with a Hindi voice if the device has one
+installed. When generating docs afterward, there's a "Translate into
+English" checkbox if you want the deliverable in English regardless of what
+language the interview was conducted in.
+
 ## How it works
 
 1. **Setup.** You enter the expert's name, the project name, and a topic
