@@ -54,12 +54,10 @@
         <input type="text" id="projectName" placeholder="e.g. Acme Logistics Platform" />
       </div>
     </div>
+    <div class="sub" style="margin:14px 0 0;">Runs through a fixed 24-question interview framework covering client context, the problem, what things looked like before, complexity, the solution, technical decisions, and impact — in whatever order fits the conversation, skipping anything already answered.</div>
     <div style="margin-top:14px;">
-      <label for="outline">Topics to cover (one per line)</label>
-      <textarea id="outline">The client and the original problem
-Technical approach and key decisions
-Obstacles hit and how they were solved
-Outcome and impact for the client</textarea>
+      <label for="outline">Extra topics to also cover (optional, one per line)</label>
+      <textarea id="outline" placeholder="Only if there's something specific beyond the standard framework, e.g. a particular compliance requirement or stakeholder to ask about"></textarea>
     </div>
     <div class="toolbar">
       <button class="btn-primary" id="startBtn">Start interview</button>
@@ -131,7 +129,7 @@ Outcome and impact for the client</textarea>
 <script>
 const $ = (id) => document.getElementById(id);
 const state = {
-  expert: "", project: "", outline: [],
+  expert: "", project: "", extraTopics: [],
   history: [], // {topic, question, answerText}
   qa: [],       // full records incl. audioBase64/mimeType, for saving
   currentQuestion: null,
@@ -189,7 +187,7 @@ async function askNextQuestion() {
     const data = await fetchJSON("/.netlify/functions/interview-next-question", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ outline: state.outline, history: state.history }),
+      body: JSON.stringify({ extraTopics: state.extraTopics, history: state.history }),
     });
     if (!state.active) return; // Finish was clicked while this request was in flight
     if (data.done) {
@@ -231,9 +229,8 @@ function speakQuestion(text) {
 $("startBtn").addEventListener("click", () => {
   state.expert = $("expertName").value.trim();
   state.project = $("projectName").value.trim();
-  state.outline = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  state.extraTopics = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
   if (!state.expert || !state.project) { setStatus($("setupStatus"), "Please fill in expert name and project name.", true); return; }
-  if (!state.outline.length) { setStatus($("setupStatus"), "Please list at least one topic.", true); return; }
   state.active = true;
   $("setupPanel").classList.add("hidden");
   $("interviewPanel").classList.remove("hidden");
