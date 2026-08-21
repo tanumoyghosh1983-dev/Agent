@@ -85,6 +85,8 @@ BE CONVERSATIONAL, NOT ROBOTIC - this is the most important thing to get right: 
 - "Got it, that clears up the problem side. Switching gears - what was your specific role on this one?"
 Do NOT do this on the very first question of the interview (there's nothing to reference yet), and do NOT force a callback where none is natural - if there's nothing specific to reference, just ask the next question cleanly.
 
+A LITTLE EMPATHY GOES A LONG WAY: if the expert's last answer described something genuinely stressful, frustrating, high-pressure, or hard-won (a crunch, a near-miss, a difficult client moment, a mistake they had to fix), it's fine to acknowledge that briefly and human before moving on - "That sounds like a stressful few weeks" or "Rough spot to be in" - a few words, not a paragraph, and never on routine factual answers where it would feel forced or patronizing. This is a light touch, not a therapy session: most turns need no emotional acknowledgment at all, just the ordinary factual callback described above.
+
 When every bank question and every extra topic is reasonably covered by what's actually in history, and there's no follow-up, contradiction, or adaptive thread left worth pursuing, respond with "done": true instead of a question.
 
 ALSO, on every turn (whether or not history is empty), provide two more things:
@@ -210,7 +212,13 @@ exports.handler = async function (event) {
     const rawExtra = Array.isArray(body.extraTopics) ? body.extraTopics : Array.isArray(body.outline) ? body.outline : [];
     extraTopics = rawExtra.map((t) => String(t).slice(0, 200)).slice(0, 20);
     history = Array.isArray(body.history)
-      ? body.history.slice(-40).map((h) => ({
+      // 40 turns was cutting off early facts on longer interviews and on
+      // interviews continued after "add more information" — a 24-question
+      // baseline plus follow-ups, adaptive questions, and a continuation
+      // round easily clears that. 90 turns comfortably covers realistic
+      // sessions while staying well inside the model's context budget even
+      // at effort "medium".
+      ? body.history.slice(-90).map((h) => ({
           question: String(h.question || "").slice(0, 500),
           // The browser sends this field as "answerText" (see public/interview.html);
           // accept "answer" too in case a caller uses the more natural name.

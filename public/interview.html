@@ -463,12 +463,41 @@ function renderCoverage(coverage) {
   $("coveragePanel").classList.remove("hidden");
 }
 
+// Picks the most natural-sounding English voice the browser/OS offers,
+// instead of leaving it to whatever the platform defaults to (which is
+// often a flat, dated-sounding system voice). Cloud/neural voices tend to
+// have "Natural", "Neural", "Enhanced", "Premium", or "Online" in their
+// name; falls back to any non-local (i.e. higher-quality network) voice,
+// then to whatever default exists. Cached once found; Chrome loads the
+// voice list asynchronously, so this also handles the case where
+// getVoices() returns empty on the very first call.
+let cachedVoice = null;
+function pickBestVoice() {
+  if (cachedVoice) return cachedVoice;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const english = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith("en"));
+  const pool = english.length ? english : voices;
+  const qualityRe = /natural|neural|enhanced|premium|online/i;
+  cachedVoice =
+    pool.find((v) => qualityRe.test(v.name)) ||
+    pool.find((v) => !v.localService) ||
+    pool[0];
+  return cachedVoice;
+}
+if (window.speechSynthesis) {
+  window.speechSynthesis.addEventListener("voiceschanged", () => { cachedVoice = null; pickBestVoice(); });
+}
+
 function speakQuestion(text) {
   try {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.05;
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    const voice = pickBestVoice();
+    if (voice) u.voice = voice;
     state.ttsSpeaking = true;
     u.onend = () => { state.ttsSpeaking = false; };
     u.onerror = () => { state.ttsSpeaking = false; };
@@ -571,15 +600,28 @@ function runVAD() {
   const data = new Uint8Array(state.analyser.frequencyBinCount);
   const orbEl = $("orb");
 
-  const startedAt = Date.now();
+  let startedAt = Date.now();
   let hasSpoken = false;
   let lastLoudAt = Date.now();
 
   const tick = () => {
     if (!state.mediaRecorder || state.mediaRecorder.state !== "recording") return;
     state.analyser.getByteFrequencyData(data);
-    const level = state.ttsSpeaking ? 0 : data.reduce((a, b) => a + b, 0) / data.length;
     const now = Date.now();
+
+    // While the question is still being read aloud, pause both the
+    // "didn't hear anything" and max-recording clocks — otherwise a long
+    // question eats into the time the expert actually has to answer.
+    // Recording keeps running the whole time either way, so an eager
+    // answer that starts before TTS finishes is never lost.
+    if (state.ttsSpeaking) {
+      startedAt = now;
+      lastLoudAt = now;
+      state.vadRaf = requestAnimationFrame(tick);
+      return;
+    }
+
+    const level = data.reduce((a, b) => a + b, 0) / data.length;
 
     const norm = Math.min(1, level / 70);
     orbEl.style.transform = `scale(${1 + norm * 0.28})`;
@@ -823,6 +865,15 @@ async function finishInterview() {
       }),
     });
     state.sessionId = data.id;
+    if (data.isUpdate) {
+      // The server already deleted the stale case-study/raw-transcript
+      // docs for this session (the transcript just changed); also clear
+      // this tab's in-memory cache of them so re-opening it in the Archive
+      // regenerates fresh content instead of showing what was cached from
+      // before the continuation.
+      docCache.delete(data.id + ":clean");
+      docCache.delete(data.id + ":full");
+    }
   } catch (err) {
     state.sessionId = null;
     state.saveError = err.message;
@@ -1024,7 +1075,15 @@ function renderArchive() {
   });
 
   list.innerHTML = "";
-  [...groups.keys()].sort((a, b) => a.localeCompare(b)).forEach((client) => {
+  // Order clients by their most recent interview, not alphabetically — a
+  // client interviewed five minutes ago should surface above one whose
+  // name happens to sort earlier but hasn't been touched in months.
+  const clientsByRecency = [...groups.keys()].sort((a, b) => {
+    const latestA = groups.get(a).reduce((max, s) => (s.createdAt > max ? s.createdAt : max), "");
+    const latestB = groups.get(b).reduce((max, s) => (s.createdAt > max ? s.createdAt : max), "");
+    return latestA < latestB ? 1 : latestA > latestB ? -1 : 0;
+  });
+  clientsByRecency.forEach((client) => {
     const sessions = groups.get(client).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     const group = document.createElement("div");
     group.className = "client-group";
