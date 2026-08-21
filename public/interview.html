@@ -145,6 +145,17 @@
   .badge-warn { background: #fff1e6; color: #c2650a; }
   .badge-ok { background: #e7f8ee; color: #16a34a; }
   .tag-pill { display: inline-block; background: #f1f2fa; color: var(--muted); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin: 0 6px 6px 0; }
+
+  /* --- Coverage/depth meter --- */
+  .coverage-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .coverage-label { flex: 0 0 150px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .coverage-track { flex: 1; height: 8px; border-radius: 6px; background: #eef0fa; overflow: hidden; }
+  .coverage-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .4s ease; }
+  .coverage-pct { flex: 0 0 34px; font-size: 12px; font-weight: 700; color: var(--text); text-align: right; }
+
+  /* --- Answer feedback chips --- */
+  .feedback-chip { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 20px; margin: 0 6px 4px 0; background: #fff1e6; color: #c2650a; }
+  .feedback-chip.good { background: #e7f8ee; color: #16a34a; }
 </style>
 </head>
 <body>
@@ -186,14 +197,6 @@
         </div>
         <div class="status" style="text-align:left; margin-top:2px;" id="priorContextNote"></div>
 
-        <div style="margin-top:18px;">
-          <label>Interview depth</label>
-          <div class="toolbar left" style="margin-top:0;">
-            <label class="checkbox"><input type="radio" name="depth" value="standard" checked /> Standard — full 24-question framework + follow-ups</label>
-            <label class="checkbox"><input type="radio" name="depth" value="quick" /> Quick — hits the essentials, respects limited time</label>
-          </div>
-        </div>
-
         <details style="margin-top:18px;">
           <summary>Add reference material (optional)</summary>
           <label for="referenceMaterial">Paste a project brief, ticket, or notes — the agent won't re-ask what's already here</label>
@@ -201,11 +204,6 @@
           <input type="file" id="referenceFile" accept=".txt,.md" style="margin-top:8px;" />
         </details>
 
-        <details style="margin-top:18px;">
-          <summary>Add extra topics (optional)</summary>
-          <label for="outline">One per line — beyond the standard 24-question framework</label>
-          <textarea id="outline" placeholder="e.g. a particular compliance requirement or stakeholder to ask about"></textarea>
-        </details>
         <div class="toolbar left">
           <button class="btn-primary" id="startBtn">Start interview</button>
         </div>
@@ -252,7 +250,16 @@
           <button class="btn-secondary" id="pauseBtn">Pause interview</button>
           <button class="btn-primary hidden" id="resumeBtn">Resume interview</button>
           <button class="btn-ghost" id="finishBtn">Finish interview</button>
+          <button class="btn-ghost" id="toggleTranscriptBtn">Show live transcript</button>
         </div>
+      </div>
+
+      <div class="panel hidden" id="coveragePanel">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <h2 style="font-size:14px; margin:0; letter-spacing:-.01em;">Interview completeness</h2>
+          <span id="coverageOverall" style="font-size:13px; font-weight:700; color:var(--accent);">0%</span>
+        </div>
+        <div id="coverageBars"></div>
       </div>
 
       <div class="panel hidden" id="transcriptPanel">
@@ -314,11 +321,12 @@ const state = {
   sessionId: null,
   industry: "", technologies: "",
   priorContext: "", // summary of what earlier experts already said about this same project
-  depth: "standard",
   referenceMaterial: "",
   knownEntities: new Set(), // proper nouns already seen this session, for the "new name/term" note
   recentAnswerWordCounts: [], // for the low-energy nudge
   energyDismissed: false,
+  transcriptVisible: false,
+  coverage: null, // {stage: pct} from the last interview-next-question response
 };
 
 const VAD_THRESHOLD = 12;
@@ -364,18 +372,31 @@ $("navArchive").addEventListener("click", () => showView("archive"));
 $("navDashboard").addEventListener("click", () => showView("dashboard"));
 
 // ============ Interview flow ============
+const FEEDBACK_LABELS = {
+  too_short: "Too short", too_vague: "Too vague", too_technical: "Too technical",
+  missing_example: "Missing example", missing_numbers: "Missing numbers",
+};
+
 function renderTranscript() {
   const list = $("qaList");
-  if (!state.history.length) { $("transcriptPanel").classList.add("hidden"); return; }
-  $("transcriptPanel").classList.remove("hidden");
   list.innerHTML = "";
-  state.history.forEach((h) => {
+  state.qa.forEach((h) => {
     const div = document.createElement("div");
     div.className = "qa-item";
-    div.innerHTML = `<div class="qa-q">${escapeHtml(h.question)}</div><div class="qa-a">${escapeHtml(h.answerText)}</div>`;
+    const chips = (h.feedback || []).map((f) => `<span class="feedback-chip">${escapeHtml(FEEDBACK_LABELS[f] || f)}</span>`).join("");
+    div.innerHTML = `<div class="qa-q">${escapeHtml(h.question)}</div>${chips}<div class="qa-a">${escapeHtml(h.answerText)}</div>`;
     list.appendChild(div);
   });
+  // Visibility is controlled entirely by the toggle button, not by whether
+  // there's content — live transcript stays hidden by default.
+  $("transcriptPanel").classList.toggle("hidden", !state.transcriptVisible);
 }
+
+$("toggleTranscriptBtn").addEventListener("click", () => {
+  state.transcriptVisible = !state.transcriptVisible;
+  $("toggleTranscriptBtn").textContent = state.transcriptVisible ? "Hide live transcript" : "Show live transcript";
+  renderTranscript();
+});
 
 async function askNextQuestion() {
   cancelAutoAdvance();
@@ -394,11 +415,19 @@ async function askNextQuestion() {
         history: state.history,
         projectMeta: { industry: state.industry, technologies: state.technologies },
         priorContext: state.priorContext || null,
-        depth: state.depth,
         referenceMaterial: state.referenceMaterial || null,
       }),
     });
     if (!state.active) return;
+
+    // Feedback on the answer just given belongs to the qa entry that
+    // triggered this fetch (the most recently committed one).
+    if (data.answerFeedback && state.qa.length) {
+      state.qa[state.qa.length - 1].feedback = data.answerFeedback;
+      renderTranscript();
+    }
+    if (data.coverage) renderCoverage(data.coverage);
+
     if (data.done) { finishInterview(); return; }
     state.currentQuestion = data;
     $("topicTag").textContent = data.topic || "Question";
@@ -410,6 +439,24 @@ async function askNextQuestion() {
     setOrb("idle", "Something went wrong");
     setStatus($("recStatus"), err.message, true);
   }
+}
+
+function renderCoverage(coverage) {
+  state.coverage = coverage;
+  const stages = Object.keys(coverage);
+  const vals = Object.values(coverage);
+  const overall = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+  $("coverageOverall").textContent = overall + "%";
+  const bars = $("coverageBars");
+  bars.innerHTML = "";
+  stages.forEach((stage) => {
+    const pct = coverage[stage];
+    const row = document.createElement("div");
+    row.className = "coverage-row";
+    row.innerHTML = `<div class="coverage-label">${escapeHtml(stage)}</div><div class="coverage-track"><div class="coverage-fill" style="width:${pct}%"></div></div><div class="coverage-pct">${pct}%</div>`;
+    bars.appendChild(row);
+  });
+  $("coveragePanel").classList.remove("hidden");
 }
 
 function speakQuestion(text) {
@@ -441,8 +488,6 @@ $("startBtn").addEventListener("click", () => {
   state.project = $("projectName").value.trim();
   state.industry = $("industry").value.trim();
   state.technologies = $("technologies").value.trim();
-  state.extraTopics = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
-  state.depth = document.querySelector('input[name="depth"]:checked').value;
   state.referenceMaterial = $("referenceMaterial").value.trim();
   state.knownEntities = new Set();
   state.recentAnswerWordCounts = [];
@@ -823,21 +868,22 @@ function resetToSetup() {
   state.industry = "";
   state.technologies = "";
   state.priorContext = "";
-  state.depth = "standard";
   state.referenceMaterial = "";
   state.knownEntities = new Set();
   state.recentAnswerWordCounts = [];
   state.energyDismissed = false;
   $("qaList").innerHTML = "";
   $("transcriptPanel").classList.add("hidden");
+  state.transcriptVisible = false;
+  $("toggleTranscriptBtn").textContent = "Show live transcript";
+  state.coverage = null;
+  $("coveragePanel").classList.add("hidden");
   $("expertName").value = "";
   $("projectName").value = "";
   $("industry").value = "";
   $("technologies").value = "";
-  $("outline").value = "";
   $("referenceMaterial").value = "";
   $("referenceFile").value = "";
-  document.querySelector('input[name="depth"][value="standard"]').checked = true;
   $("priorContextNote").textContent = "";
   $("energyBanner").classList.add("hidden");
   $("entityNote").classList.add("hidden");
