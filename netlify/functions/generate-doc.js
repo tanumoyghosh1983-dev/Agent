@@ -1,10 +1,13 @@
 // Netlify Function: generate-doc.js
 // Turns a finished interview transcript (question/answer pairs) into either:
-//   - "clean" mode: the same Q&A, in the same order, with each answer just
-//     grammar-fixed and de-filler'd into a logical, readable paragraph. No
-//     restructuring, no new headings beyond the existing questions.
-//   - "full" mode: a structured, detailed Markdown documentation draft,
-//     reorganized by topic — the fuller "build a real doc from this" output.
+//   - "clean" mode ("Raw transcript" in the UI): the same Q&A, in the same
+//     order, with each answer just grammar-fixed and de-filler'd into a
+//     logical paragraph. Still visibly Q&A. No restructuring.
+//   - "full" mode ("Case study" in the UI): a flowing narrative case study
+//     article — no questions, no Q&A structure, written as connected prose
+//     organized the way a real case study reads (client context, the
+//     challenge, the solution, the outcome), built entirely from the
+//     answers' content.
 // Neither mode touches images/design — this tool is text-only end to end.
 //
 // If a sessionId is provided, the result is also persisted to Netlify Blobs
@@ -16,18 +19,21 @@
 
 const { openStore } = require("./lib/blob-store");
 
-const FULL_SYSTEM_PROMPT = `You are a technical writer turning an interview transcript with a subject-matter expert into detailed internal documentation about a client project.
+const FULL_SYSTEM_PROMPT = `You are a case study writer turning an interview transcript with a subject-matter expert into a polished, narrative case study about a client project — the kind of write-up a real company would publish or keep as an internal case study, not a Q&A record.
 
-You will receive the expert's name, the project name, and a list of {topic, question, answer} entries in the order they were discussed.
+You will receive the expert's name, the project name, and a list of {topic, question, answer} entries in the order they were discussed during the interview.
 
-Write clear, well-organized Markdown documentation. Rules:
-- GROUNDING IS CRITICAL: only include facts, names, numbers, tools, and claims that are actually present in the answers. Never invent details, outcomes, or specifics that weren't said. If something is ambiguous or incomplete in the transcript, say so plainly (e.g. "not specified in the interview") rather than filling the gap.
-- Organize by theme/topic, not strictly in transcript order, if that reads better (e.g. group all "technical approach" answers together even if follow-ups were interleaved).
-- Use headings, bullet lists, and short paragraphs. Pull out concrete details (names, tools, numbers, dates, decisions, obstacles, workarounds) rather than paraphrasing vaguely.
-- Include a short "Open questions / gaps" section at the end listing anything important that the interview didn't cover, if applicable.
-- Do not editorialize or add generic filler ("in today's fast-paced world", etc). Stay factual and specific to what was said.
+WRITE A NARRATIVE, NOT A TRANSCRIPT:
+- Do NOT reproduce the interview questions anywhere in the output, and do NOT structure the piece as Q&A. Weave everything the expert said into connected, flowing prose, the way a published case study reads.
+- Organize it the way a real case study is structured, using whichever of these sections the material actually supports: a short client/context overview, the challenge/problem, the approach or solution, and the outcome/impact. Use clear Markdown headings for these sections.
+- It is fine — expected, even — to use natural connective and framing language that a case study normally has (e.g. "Faced with this challenge, the team...", "The result was...") even though the expert never said those exact words. That is normal case-study prose, not fabrication.
 
-Output ONLY the Markdown document (starting with a top-level heading), no preamble, no code fences.`;
+GROUNDING IS STILL CRITICAL — the line not to cross:
+- Every FACT, NAME, NUMBER, TOOL, DECISION, or CLAIM about what actually happened must come from the transcript. Never invent a metric, outcome, technology, date, or specific claim that wasn't said.
+- Connective narrative framing (see above) is fine; fabricated content is not. If the transcript is genuinely thin on a section (e.g. no measurable results were given), write that section honestly and briefly from what little exists rather than inventing numbers or outcomes to fill it out.
+- Do not use generic marketing filler unrelated to this specific project ("in today's fast-paced world", "cutting-edge solution", etc).
+
+Output ONLY the Markdown case study (starting with a title as a top-level heading), no preamble, no code fences, no questions anywhere in the text.`;
 
 const CLEAN_SYSTEM_PROMPT = `You are cleaning up a raw spoken-word interview transcript into readable text. You are NOT writing a report — keep the exact same question order and the exact same content, just make it read cleanly.
 
@@ -54,7 +60,7 @@ async function callClaude(apiKey, model, expert, project, qa, mode) {
     .join("\n\n");
 
   const systemPrompt = mode === "clean" ? CLEAN_SYSTEM_PROMPT : FULL_SYSTEM_PROMPT;
-  const instruction = mode === "clean" ? "Clean up the transcript." : "Write the documentation.";
+  const instruction = mode === "clean" ? "Clean up the transcript." : "Write the narrative case study.";
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

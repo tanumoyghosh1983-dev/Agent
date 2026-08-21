@@ -195,7 +195,13 @@
           </div>
         </div>
 
+        <div id="pausedNotice" class="hidden" style="margin-top:14px; text-align:center;">
+          <div class="status" style="color:var(--accent); font-weight:600;">Paused — take your time, resume whenever you're ready.</div>
+        </div>
+
         <div class="toolbar" style="margin-top:20px;">
+          <button class="btn-secondary" id="pauseBtn">Pause interview</button>
+          <button class="btn-primary hidden" id="resumeBtn">Resume interview</button>
           <button class="btn-ghost" id="finishBtn">Finish interview</button>
         </div>
       </div>
@@ -245,6 +251,7 @@ const state = {
   micStream: null, audioCtx: null, analyser: null, vadRaf: null,
   autoAdvanceTimer: null,
   active: false, // false once Finish is clicked — guards against in-flight requests reviving the UI/mic afterward
+  paused: false,
   ttsSpeaking: false,
   sessionId: null,
 };
@@ -428,8 +435,46 @@ function stopListening() {
 
 $("stopBtn").addEventListener("click", stopListening);
 
+// ============ Pause / Resume ============
+// Lets an expert step away mid-interview (e.g. to take a client call)
+// without losing their place. Pausing stops the mic and any in-progress
+// listening/speaking; resuming re-starts listening for the same question
+// that was on screen. A partial recording in progress when Pause is
+// clicked is discarded (not transcribed/submitted) rather than treated as
+// a real answer.
+function pauseInterview() {
+  if (state.paused || !state.active) return;
+  state.paused = true;
+  cancelAutoAdvance();
+  try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+  stopListening();
+  setOrb("idle", "Paused");
+  $("pauseBtn").classList.add("hidden");
+  $("resumeBtn").classList.remove("hidden");
+  $("pausedNotice").classList.remove("hidden");
+}
+
+function resumeInterview() {
+  if (!state.paused) return;
+  state.paused = false;
+  $("pauseBtn").classList.remove("hidden");
+  $("resumeBtn").classList.add("hidden");
+  $("pausedNotice").classList.add("hidden");
+  // If there's no pending transcribed answer to review, resume listening
+  // for the question that was on screen when paused.
+  if ($("answerReview").classList.contains("hidden") && state.currentQuestion) {
+    startListening();
+  } else {
+    setOrb("idle", "Resumed");
+  }
+}
+
+$("pauseBtn").addEventListener("click", pauseInterview);
+$("resumeBtn").addEventListener("click", resumeInterview);
+
 async function onRecordingStop() {
   if (!state.active) return;
+  if (state.paused) return; // recording was cut short by Pause — discard it, don't transcribe
   state.recordedBlob = new Blob(state.chunks, { type: mimeType });
   setOrb("thinking", "Transcribing…");
   setStatus($("recStatus"), "");
@@ -549,10 +594,10 @@ $("modalCaseStudyBtn").addEventListener("click", async () => {
   showView("archive");
   await loadArchive();
   if (sessionIdToUse) {
-    openSession(sessionIdToUse, capturedExpert, capturedProject, true);
+    openSession(sessionIdToUse, capturedExpert, capturedProject, "full", true);
   } else {
     // No session id: render the case study inline without archive persistence.
-    const md = await generateCaseStudyMarkdown(capturedExpert, capturedProject, capturedQa, null);
+    const md = await generateDocMarkdown(capturedExpert, capturedProject, capturedQa, "full", null);
     alert("Session couldn't be archived, but here's the case study:\n\n" + md.slice(0, 4000));
   }
 });
@@ -562,11 +607,15 @@ function resetToSetup() {
   state.history = [];
   state.sessionId = null;
   state.currentQuestion = null;
+  state.paused = false;
   $("qaList").innerHTML = "";
   $("transcriptPanel").classList.add("hidden");
   $("expertName").value = "";
   $("projectName").value = "";
   $("outline").value = "";
+  $("pauseBtn").classList.remove("hidden");
+  $("resumeBtn").classList.add("hidden");
+  $("pausedNotice").classList.add("hidden");
   setStatus($("setupStatus"), "");
   $("setupPanel").classList.remove("hidden");
   $("interviewPanel").classList.add("hidden");
@@ -629,6 +678,11 @@ function renderArchive() {
   });
 }
 
+// Cache of already-fetched/generated doc text, keyed by "sessionId:mode",
+// so switching between Raw transcript / Case study (or re-opening a card)
+// doesn't re-generate or re-fetch every time.
+const docCache = new Map();
+
 function buildSessionCard(s) {
   const card = document.createElement("div");
   card.className = "session-card";
@@ -640,62 +694,87 @@ function buildSessionCard(s) {
         <div class="session-title">${escapeHtml(s.expert)}</div>
         <div class="session-meta">${date} · session ${s.id}</div>
       </div>
-      <button class="btn-secondary btn-sm">View case study</button>
+      <div class="toolbar left" style="margin:0;">
+        <button class="btn-secondary btn-sm" data-mode="clean">Raw transcript</button>
+        <button class="btn-secondary btn-sm" data-mode="full">Case study</button>
+      </div>
     </div>
     <div class="session-body hidden"></div>
   `;
-  const btn = card.querySelector("button");
   const body = card.querySelector(".session-body");
-  btn.addEventListener("click", () => {
-    const opening = body.classList.contains("hidden");
-    body.classList.toggle("hidden");
-    btn.textContent = opening ? "Hide" : "View case study";
-    if (opening && !body.dataset.loaded) openSessionBody(s, body);
+  card.querySelectorAll("[data-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      const alreadyActive = card.dataset.activeMode === mode && !body.classList.contains("hidden");
+      if (alreadyActive) {
+        body.classList.add("hidden");
+        card.dataset.activeMode = "";
+        card.querySelectorAll("[data-mode]").forEach((b) => b.classList.remove("btn-primary"));
+        return;
+      }
+      card.dataset.activeMode = mode;
+      card.querySelectorAll("[data-mode]").forEach((b) => {
+        const isActive = b.dataset.mode === mode;
+        b.classList.toggle("btn-primary", isActive);
+        b.classList.toggle("btn-secondary", !isActive);
+      });
+      body.classList.remove("hidden");
+      loadSessionDoc(s, mode, body);
+    });
   });
   return card;
 }
 
-async function openSession(id, expert, project, autoScroll) {
+async function openSession(id, expert, project, mode, autoScroll) {
   const card = document.getElementById("session-" + id);
   if (!card) return;
-  const btn = card.querySelector("button");
   const body = card.querySelector(".session-body");
+  card.dataset.activeMode = mode;
+  card.querySelectorAll("[data-mode]").forEach((b) => {
+        const isActive = b.dataset.mode === mode;
+        b.classList.toggle("btn-primary", isActive);
+        b.classList.toggle("btn-secondary", !isActive);
+      });
   body.classList.remove("hidden");
-  btn.textContent = "Hide";
-  await openSessionBody({ id, expert, project }, body);
+  await loadSessionDoc({ id, expert, project }, mode, body);
   if (autoScroll) card.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-async function openSessionBody(s, body) {
-  body.dataset.loaded = "1";
-  body.innerHTML = `<div class="status" style="text-align:left;">Loading case study…</div>`;
+async function loadSessionDoc(s, mode, body) {
+  const cacheKey = s.id + ":" + mode;
+  const label = mode === "full" ? "case study" : "raw transcript";
+  if (docCache.has(cacheKey)) {
+    renderSessionBody(body, s, mode, docCache.get(cacheKey));
+    return;
+  }
+  body.innerHTML = `<div class="status" style="text-align:left;">Loading ${label}…</div>`;
   try {
-    // Try the already-generated case study first.
     let markdown = null;
-    const res = await fetch(`/.netlify/functions/list-sessions?id=${encodeURIComponent(s.id)}&doc=clean`);
+    const res = await fetch(`/.netlify/functions/list-sessions?id=${encodeURIComponent(s.id)}&doc=${mode}`);
     if (res.ok) {
       markdown = await res.text();
     } else {
       // Not generated yet — fetch the full record and generate it now.
       const record = await fetchJSON(`/.netlify/functions/list-sessions?id=${encodeURIComponent(s.id)}`);
-      markdown = await generateCaseStudyMarkdown(record.expert, record.project, record.qa, s.id);
+      markdown = await generateDocMarkdown(record.expert, record.project, record.qa, mode, s.id);
     }
-    renderSessionBody(body, s, markdown);
+    docCache.set(cacheKey, markdown);
+    renderSessionBody(body, s, mode, markdown);
   } catch (err) {
-    body.innerHTML = `<div class="status err" style="text-align:left;">Couldn't load this case study: ${escapeHtml(err.message)}</div>`;
+    body.innerHTML = `<div class="status err" style="text-align:left;">Couldn't load this ${label}: ${escapeHtml(err.message)}</div>`;
   }
 }
 
-async function generateCaseStudyMarkdown(expert, project, qa, sessionId) {
+async function generateDocMarkdown(expert, project, qa, mode, sessionId) {
   const data = await fetchJSON("/.netlify/functions/generate-doc", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ expert, project, qa, mode: "clean", sessionId }),
+    body: JSON.stringify({ expert, project, qa, mode, sessionId }),
   });
   return data.markdown;
 }
 
-function renderSessionBody(body, s, markdown) {
+function renderSessionBody(body, s, mode, markdown) {
   body.innerHTML = "";
   const pre = document.createElement("pre");
   pre.className = "doc-text";
@@ -717,7 +796,8 @@ function renderSessionBody(body, s, markdown) {
   const downloadBtn = document.createElement("button");
   downloadBtn.className = "btn-secondary btn-sm";
   downloadBtn.textContent = "Download (.md)";
-  downloadBtn.addEventListener("click", () => downloadFile(`case-study-${slug(s.project)}-${s.id}.md`, markdown, "text/markdown"));
+  const filePrefix = mode === "full" ? "case-study" : "raw-transcript";
+  downloadBtn.addEventListener("click", () => downloadFile(`${filePrefix}-${slug(s.project)}-${s.id}.md`, markdown, "text/markdown"));
   toolbar.appendChild(copyBtn);
   toolbar.appendChild(downloadBtn);
   body.appendChild(toolbar);
