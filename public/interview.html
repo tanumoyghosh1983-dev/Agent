@@ -185,6 +185,22 @@
           </div>
         </div>
         <div class="status" style="text-align:left; margin-top:2px;" id="priorContextNote"></div>
+
+        <div style="margin-top:18px;">
+          <label>Interview depth</label>
+          <div class="toolbar left" style="margin-top:0;">
+            <label class="checkbox"><input type="radio" name="depth" value="standard" checked /> Standard — full 24-question framework + follow-ups</label>
+            <label class="checkbox"><input type="radio" name="depth" value="quick" /> Quick — hits the essentials, respects limited time</label>
+          </div>
+        </div>
+
+        <details style="margin-top:18px;">
+          <summary>Add reference material (optional)</summary>
+          <label for="referenceMaterial">Paste a project brief, ticket, or notes — the agent won't re-ask what's already here</label>
+          <textarea id="referenceMaterial" placeholder="Paste text, or use the file picker below (.txt/.md)"></textarea>
+          <input type="file" id="referenceFile" accept=".txt,.md" style="margin-top:8px;" />
+        </details>
+
         <details style="margin-top:18px;">
           <summary>Add extra topics (optional)</summary>
           <label for="outline">One per line — beyond the standard 24-question framework</label>
@@ -208,11 +224,18 @@
         <div class="question" id="questionText">Loading question…</div>
         <div class="status" id="recStatus"></div>
 
+        <div id="energyBanner" class="hidden" style="margin-top:12px; text-align:center; background:#fff6ea; border:1px solid #f2d9ab; border-radius:12px; padding:10px 14px;">
+          <span style="font-size:13.5px; color:#8a5a00;">Answers are getting shorter — feeling low energy?</span>
+          <button class="btn-secondary btn-sm" id="energyPauseBtn" style="margin-left:8px;">Pause now</button>
+          <button class="btn-ghost btn-sm" id="energyDismissBtn" style="margin-left:2px;">Dismiss</button>
+        </div>
+
         <div class="toolbar">
           <button class="btn-secondary hidden" id="stopBtn">I'm done — stop listening</button>
         </div>
 
         <div id="answerReview" class="hidden" style="margin-top:14px;">
+          <div id="entityNote" class="hidden" style="font-size:12.5px; color:var(--accent); font-weight:600; margin-bottom:6px;"></div>
           <label>Transcribed answer (edit if needed — moving on automatically)</label>
           <textarea id="answerText"></textarea>
           <div class="toolbar">
@@ -291,6 +314,11 @@ const state = {
   sessionId: null,
   industry: "", technologies: "",
   priorContext: "", // summary of what earlier experts already said about this same project
+  depth: "standard",
+  referenceMaterial: "",
+  knownEntities: new Set(), // proper nouns already seen this session, for the "new name/term" note
+  recentAnswerWordCounts: [], // for the low-energy nudge
+  energyDismissed: false,
 };
 
 const VAD_THRESHOLD = 12;
@@ -353,6 +381,7 @@ async function askNextQuestion() {
   cancelAutoAdvance();
   $("answerReview").classList.add("hidden");
   $("stopBtn").classList.add("hidden");
+  $("energyBanner").classList.add("hidden");
   setStatus($("recStatus"), "");
   setOrb("thinking", "Thinking of the next question…");
   $("questionText").textContent = "…";
@@ -365,6 +394,8 @@ async function askNextQuestion() {
         history: state.history,
         projectMeta: { industry: state.industry, technologies: state.technologies },
         priorContext: state.priorContext || null,
+        depth: state.depth,
+        referenceMaterial: state.referenceMaterial || null,
       }),
     });
     if (!state.active) return;
@@ -394,12 +425,28 @@ function speakQuestion(text) {
   } catch (e) { state.ttsSpeaking = false; }
 }
 
+$("referenceFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const existing = $("referenceMaterial").value.trim();
+    $("referenceMaterial").value = existing ? existing + "\n\n" + reader.result : reader.result;
+  };
+  reader.readAsText(file);
+});
+
 $("startBtn").addEventListener("click", () => {
   state.expert = $("expertName").value.trim();
   state.project = $("projectName").value.trim();
   state.industry = $("industry").value.trim();
   state.technologies = $("technologies").value.trim();
   state.extraTopics = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  state.depth = document.querySelector('input[name="depth"]:checked').value;
+  state.referenceMaterial = $("referenceMaterial").value.trim();
+  state.knownEntities = new Set();
+  state.recentAnswerWordCounts = [];
+  state.energyDismissed = false;
   if (!state.expert || !state.project) { setStatus($("setupStatus"), "Please fill in expert name and project name.", true); return; }
   state.active = true;
   $("setupPanel").classList.add("hidden");
@@ -489,11 +536,15 @@ function runVAD() {
     orbEl.style.transform = `scale(${1 + norm * 0.28})`;
 
     if (level > VAD_THRESHOLD) {
+      if (!hasSpoken) state.lastTimeToSpeechMs = now - startedAt;
       hasSpoken = true;
       lastLoudAt = now;
       $("orbCaption").innerHTML = '<span class="pulse-dot"></span>Listening…';
     } else if (hasSpoken) {
-      $("orbCaption").textContent = "Listening… (pause)";
+      // Gentler wording the longer the pause goes on, before it hard-stops —
+      // reads as patient rather than like a countdown timer.
+      const pauseMs = now - lastLoudAt;
+      $("orbCaption").textContent = pauseMs > 900 ? "Take your time…" : "Listening… (pause)";
     }
 
     if (hasSpoken && now - lastLoudAt > SILENCE_STOP_MS) { stopListening(); return; }
@@ -554,6 +605,39 @@ function resumeInterview() {
 $("pauseBtn").addEventListener("click", pauseInterview);
 $("resumeBtn").addEventListener("click", resumeInterview);
 
+// Common verbal correction cues — deliberately conservative (only fairly
+// unambiguous phrasings) since a false positive discards a real answer.
+// This is a heuristic, not true intent understanding: it will miss less
+// common phrasings, and that's an accepted tradeoff over risking false
+// positives on legitimate answers.
+const CORRECTION_CUE_RE = /\b(scratch that|ignore that|forget (that|what i just said)|let me (redo|restart|try that again)|start(ing)? over|redo that|disregard that|actually,? no,? (let me|i meant)|wait,? that'?s not right)\b/i;
+
+function detectCorrectionCue(text) {
+  return CORRECTION_CUE_RE.test(text);
+}
+
+// Very rough named-entity spotting: sequences of Title-Case words that
+// aren't the first word of a sentence (so we skip normal capitalized
+// sentence starts) and aren't common Title-Case words. Good enough to flag
+// "hey, check this spelling" — not real NER, and it will both miss things
+// and occasionally flag a normal word. That's fine for a nudge, not fatal.
+const COMMON_CAPITALIZED_WORDS = new Set(["I", "The", "A", "An", "We", "It", "This", "That", "They", "He", "She", "You", "So", "But", "And", "Yes", "No", "Okay", "Well"]);
+function findNewEntities(text) {
+  const found = new Set();
+  const re = /(?:^|[.!?]\s+|,\s+|"\s*)([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){0,2})/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const phrase = m[1].trim();
+    const firstWord = phrase.split(" ")[0];
+    if (COMMON_CAPITALIZED_WORDS.has(firstWord)) continue;
+    if (phrase.length < 3) continue;
+    found.add(phrase);
+  }
+  const brandNew = [...found].filter((e) => !state.knownEntities.has(e));
+  found.forEach((e) => state.knownEntities.add(e));
+  return brandNew;
+}
+
 async function onRecordingStop() {
   if (!state.active) return;
   if (state.paused) return; // recording was cut short by Pause — discard it, don't transcribe
@@ -568,8 +652,31 @@ async function onRecordingStop() {
       body: JSON.stringify({ audioBase64, mimeType }),
     });
     if (!state.active) return;
-    $("answerText").value = data.text || "";
+    const text = data.text || "";
+
+    if (detectCorrectionCue(text)) {
+      // The expert asked to redo this answer mid- or right after speaking —
+      // discard it and start listening again for the same question instead
+      // of treating the correction phrase itself as content.
+      setOrb("idle", "No problem — let's try that again");
+      setStatus($("recStatus"), "Heard a correction cue — restarting this answer.");
+      state.recordedBlob = null;
+      setTimeout(startListening, 900);
+      return;
+    }
+
+    $("answerText").value = text;
     $("answerReview").classList.remove("hidden");
+
+    const newEntities = findNewEntities(text);
+    const entityNote = $("entityNote");
+    if (newEntities.length) {
+      entityNote.textContent = "New name/term mentioned — double-check spelling: " + newEntities.join(", ");
+      entityNote.classList.remove("hidden");
+    } else {
+      entityNote.classList.add("hidden");
+    }
+
     setOrb("idle", "Got it — moving on automatically");
     setStatus($("recStatus"), "Edit the text or click Continue to go now.");
     scheduleAutoAdvance();
@@ -613,12 +720,35 @@ async function commitPendingAnswer() {
   state.qa.push(record);
   state.history.push({ topic: record.topic, question: record.question, answerText });
   renderTranscript();
+  trackEnergy(answerText);
 
   $("answerReview").classList.add("hidden");
   $("answerText").value = "";
   state.recordedBlob = null;
+  $("entityNote").classList.add("hidden");
   return true;
 }
+
+// Low-energy nudge: a real (if rough) signal that an expert is running out
+// of steam is answers getting noticeably shorter and slower to start,
+// several in a row. This never auto-pauses — it just surfaces the option,
+// since only the expert actually knows if they're tired or just being
+// concise on an easy question.
+const ENERGY_WORD_THRESHOLD = 12;
+const ENERGY_STREAK_TO_FLAG = 2;
+function trackEnergy(answerText) {
+  const wordCount = answerText.trim().split(/\s+/).filter(Boolean).length;
+  state.recentAnswerWordCounts.push(wordCount);
+  if (state.recentAnswerWordCounts.length > 5) state.recentAnswerWordCounts.shift();
+
+  if (state.energyDismissed || state.recentAnswerWordCounts.length < ENERGY_STREAK_TO_FLAG) return;
+  const recent = state.recentAnswerWordCounts.slice(-ENERGY_STREAK_TO_FLAG);
+  const allShort = recent.every((c) => c <= ENERGY_WORD_THRESHOLD);
+  const slowToStart = (state.lastTimeToSpeechMs || 0) > 6000;
+  if (allShort || slowToStart) $("energyBanner").classList.remove("hidden");
+}
+$("energyPauseBtn").addEventListener("click", () => { $("energyBanner").classList.add("hidden"); pauseInterview(); });
+$("energyDismissBtn").addEventListener("click", () => { $("energyBanner").classList.add("hidden"); state.energyDismissed = true; });
 
 async function submitAnswer() {
   const committed = await commitPendingAnswer();
@@ -693,6 +823,11 @@ function resetToSetup() {
   state.industry = "";
   state.technologies = "";
   state.priorContext = "";
+  state.depth = "standard";
+  state.referenceMaterial = "";
+  state.knownEntities = new Set();
+  state.recentAnswerWordCounts = [];
+  state.energyDismissed = false;
   $("qaList").innerHTML = "";
   $("transcriptPanel").classList.add("hidden");
   $("expertName").value = "";
@@ -700,7 +835,12 @@ function resetToSetup() {
   $("industry").value = "";
   $("technologies").value = "";
   $("outline").value = "";
+  $("referenceMaterial").value = "";
+  $("referenceFile").value = "";
+  document.querySelector('input[name="depth"][value="standard"]').checked = true;
   $("priorContextNote").textContent = "";
+  $("energyBanner").classList.add("hidden");
+  $("entityNote").classList.add("hidden");
   $("pauseBtn").classList.remove("hidden");
   $("resumeBtn").classList.add("hidden");
   $("pausedNotice").classList.add("hidden");
@@ -874,9 +1014,27 @@ async function generateDocMarkdown(expert, project, qa, mode, sessionId) {
 
 function renderSessionBody(body, s, mode, markdown) {
   body.innerHTML = "";
+
+  // If the case study includes a "Suggested Next Interview" gap-flag
+  // section, split it out and style it as a distinct callout instead of
+  // letting it blend into the main text — it's an action item, not prose.
+  const gapHeadingRe = /\n##\s*Suggested Next Interview\b/i;
+  const splitIdx = markdown.search(gapHeadingRe);
+  const mainText = splitIdx >= 0 ? markdown.slice(0, splitIdx).trimEnd() : markdown;
+  const gapText = splitIdx >= 0 ? markdown.slice(splitIdx).replace(/^\n##\s*Suggested Next Interview\b\s*/i, "").trim() : null;
+
   const pre = document.createElement("pre");
   pre.className = "doc-text";
-  pre.textContent = markdown;
+  pre.textContent = mainText;
+
+  if (gapText) {
+    const callout = document.createElement("div");
+    callout.style.cssText = "margin-top:14px; background:#fff6ea; border:1px solid #f2d9ab; border-radius:14px; padding:16px 18px;";
+    callout.innerHTML = `<div style="font-weight:700; font-size:13.5px; color:#8a5a00; margin-bottom:6px;">💡 Suggested next interview</div><div style="font-size:13.5px; color:#6b5220; white-space:pre-wrap;">${escapeHtml(gapText)}</div>`;
+    pre.dataset.hasCallout = "1";
+    pre._calloutEl = callout; // attached below, after toolbar is built
+  }
+
   const toolbar = document.createElement("div");
   toolbar.className = "toolbar left";
   const copyBtn = document.createElement("button");
@@ -915,6 +1073,7 @@ function renderSessionBody(body, s, mode, markdown) {
   toolbar.appendChild(gdocsBtn);
   body.appendChild(toolbar);
   body.appendChild(pre);
+  if (pre._calloutEl) body.appendChild(pre._calloutEl);
 }
 
 // ============ Dashboard ============

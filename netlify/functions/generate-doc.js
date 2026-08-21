@@ -33,6 +33,8 @@ GROUNDING IS STILL CRITICAL — the line not to cross:
 - Connective narrative framing (see above) is fine; fabricated content is not. If the transcript is genuinely thin on a section (e.g. no measurable results were given), write that section honestly and briefly from what little exists rather than inventing numbers or outcomes to fill it out.
 - Do not use generic marketing filler unrelated to this specific project ("in today's fast-paced world", "cutting-edge solution", etc).
 
+GAP FLAGGING — only if genuinely warranted: if, after writing the case study, there's a real, material gap this single expert plainly couldn't have filled (e.g. the whole technical architecture is described secondhand because this expert was the PM, not the engineer; or the client's own reaction is never described because this expert never spoke with the client directly), add ONE final section "## Suggested Next Interview" — 1-3 short bullet points naming specifically what's missing and what kind of role would likely know it (e.g. "- The backend architecture decisions are described secondhand — worth a short interview with the engineer who owned that piece to get the technical reasoning firsthand."). Do NOT add this section if the case study is already reasonably complete — an empty or forced version of this section is worse than omitting it.
+
 Output ONLY the Markdown case study (starting with a title as a top-level heading), no preamble, no code fences, no questions anywhere in the text.`;
 
 const CLEAN_SYSTEM_PROMPT = `You are cleaning up a raw spoken-word interview transcript into readable text. You are NOT writing a report — keep the exact same question order and the exact same content, just make it read cleanly.
