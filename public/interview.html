@@ -7,7 +7,6 @@
 <style>
   :root {
     --bg: #f4f5fb;
-    --bg-2: #eef0fb;
     --panel: #ffffff;
     --border: #e6e8f5;
     --text: #1b1c2b;
@@ -16,10 +15,10 @@
     --accent-2: #38bdf8;
     --accent-3: #f472b6;
     --danger: #e0435c;
-    --ok: #16a34a;
     --shadow: 0 10px 40px rgba(80, 70, 180, 0.08), 0 2px 8px rgba(80, 70, 180, 0.06);
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
     font-family: -apple-system, "Inter", "Segoe UI", Arial, sans-serif;
@@ -28,21 +27,34 @@
       radial-gradient(1100px 500px at 15% -10%, #e3e6ff 0%, transparent 60%),
       radial-gradient(900px 500px at 110% 10%, #dcf4ff 0%, transparent 55%),
       var(--bg);
-    min-height: 100vh;
   }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 48px 20px 90px; }
-  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-  .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 12px rgba(109,94,252,.5); }
-  h1 { font-size: 26px; margin: 0; font-weight: 700; letter-spacing: -0.02em; }
-  .sub { color: var(--muted); font-size: 14.5px; margin: 10px 0 32px; line-height: 1.5; }
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 28px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow);
+
+  /* --- Portal shell: sidebar + content --- */
+  .shell { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 220px; flex: 0 0 220px; padding: 28px 16px; border-right: 1px solid var(--border);
+    background: rgba(255,255,255,.5); display: flex; flex-direction: column; gap: 4px;
   }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 0 10px 22px; }
+  .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 12px rgba(109,94,252,.5); flex: none; }
+  .brand-name { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+  .nav-btn {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 11px 12px; border-radius: 12px; border: none; background: transparent;
+    color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: background .12s ease, color .12s ease;
+  }
+  .nav-btn:hover { background: #eef0fc; color: var(--text); }
+  .nav-btn.active { background: linear-gradient(135deg, var(--accent), #8b7cff); color: #fff; box-shadow: 0 6px 18px rgba(109,94,252,.3); }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+
+  .content { flex: 1; min-width: 0; padding: 44px 32px 90px; max-width: 900px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  h1 { font-size: 24px; margin: 0; font-weight: 700; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 14px; margin: 8px 0 28px; line-height: 1.5; max-width: 560px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 28px; margin-bottom: 20px; box-shadow: var(--shadow); }
   .panel-quiet { background: transparent; border: 1px dashed var(--border); box-shadow: none; }
   label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 7px; }
   input[type=text], textarea {
@@ -66,10 +78,8 @@
   .btn-secondary:hover { background: #e9ebfa; }
   .btn-ghost { background: transparent; color: var(--muted); padding: 8px 14px; }
   .btn-ghost:hover { color: var(--text); }
-  .topic-tag {
-    display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-    color: var(--accent); background: #efedff; border-radius: 6px; padding: 4px 10px; margin-bottom: 14px;
-  }
+  .btn-sm { padding: 7px 12px; font-size: 13px; border-radius: 9px; }
+  .topic-tag { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); background: #efedff; border-radius: 6px; padding: 4px 10px; margin-bottom: 14px; }
   .question { font-size: 20px; line-height: 1.5; font-weight: 600; margin: 0 0 6px; text-align: center; min-height: 1.6em; }
   .qa-item { border-bottom: 1px solid var(--border); padding: 14px 0; }
   .qa-item:last-child { border-bottom: none; }
@@ -78,151 +88,138 @@
   .status { font-size: 13.5px; color: var(--muted); min-height: 20px; margin-top: 4px; text-align: center; }
   .status.err { color: var(--danger); }
   .hidden { display: none !important; }
-  #docOutput { white-space: pre-wrap; font-size: 13.5px; line-height: 1.6; background: #fbfbff; border: 1px solid var(--border); border-radius: 14px; padding: 18px; max-height: 480px; overflow: auto; }
+  pre.doc-text { white-space: pre-wrap; font-size: 13.5px; line-height: 1.6; background: #fbfbff; border: 1px solid var(--border); border-radius: 14px; padding: 18px; max-height: 480px; overflow: auto; font-family: inherit; margin: 0; }
   .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; justify-content: center; }
+  .toolbar.left { justify-content: flex-start; }
   details > summary { cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 6px; }
   details[open] > summary { margin-bottom: 12px; }
 
-  /* --- The orb: a Siri-style animated blob that shows agent state --- */
+  /* --- Orb --- */
   .orb-stage { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 8px 0 28px; }
-  .orb-ring {
-    width: 168px; height: 168px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 20px 50px rgba(109,94,252,.18);
-    background: #fff;
-  }
-  .orb {
-    position: relative; width: 140px; height: 140px; border-radius: 50%;
-    overflow: hidden; background: #f7f7ff;
-    transform: scale(1); transition: transform .09s ease-out;
-  }
-  .orb .blob {
-    position: absolute; width: 120%; height: 120%; top: -10%; left: -10%;
-    border-radius: 46%; filter: blur(14px); opacity: .85;
-    animation: blobSpin 9s linear infinite;
-  }
+  .orb-ring { width: 168px; height: 168px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 20px 50px rgba(109,94,252,.18); background: #fff; }
+  .orb { position: relative; width: 140px; height: 140px; border-radius: 50%; overflow: hidden; background: #f7f7ff; transform: scale(1); transition: transform .09s ease-out; }
+  .orb .blob { position: absolute; width: 120%; height: 120%; top: -10%; left: -10%; border-radius: 46%; filter: blur(14px); opacity: .85; animation: blobSpin 9s linear infinite; }
   .orb .blob.b1 { background: radial-gradient(circle at 30% 30%, var(--accent), transparent 60%); animation-duration: 7s; }
   .orb .blob.b2 { background: radial-gradient(circle at 70% 40%, var(--accent-2), transparent 60%); animation-duration: 10s; animation-direction: reverse; }
   .orb .blob.b3 { background: radial-gradient(circle at 50% 70%, var(--accent-3), transparent 60%); animation-duration: 12s; }
   @keyframes blobSpin { from { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.12); } to { transform: rotate(360deg) scale(1); } }
-
   .orb[data-state="idle"] .blob { animation-play-state: paused; opacity: .5; }
   .orb[data-state="thinking"] .blob { animation-duration: 2.2s !important; }
   .orb[data-state="speaking"] .blob { animation-duration: 3.5s !important; }
   .orb[data-state="listening"] .blob { animation-duration: 4.5s !important; }
-  .orb[data-state="done"] .blob { animation-play-state: paused; opacity: .35; }
-
   .orb-caption { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .02em; min-height: 18px; }
   .pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: dotPulse 1.4s ease-in-out infinite; vertical-align: middle; }
   @keyframes dotPulse { 0%,100% { opacity: .3; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
 
   /* --- Modal --- */
-  .modal-overlay {
-    position: fixed; inset: 0; background: rgba(27,28,43,.35); backdrop-filter: blur(3px);
-    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px;
-  }
-  .modal-card {
-    background: var(--panel); border-radius: 22px; padding: 34px; max-width: 420px; width: 100%;
-    box-shadow: 0 30px 80px rgba(30,20,80,.25); text-align: center;
-    animation: modalIn .25s cubic-bezier(.2,.9,.3,1.2);
-  }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(27,28,43,.35); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .modal-card { background: var(--panel); border-radius: 22px; padding: 34px; max-width: 420px; width: 100%; box-shadow: 0 30px 80px rgba(30,20,80,.25); text-align: center; animation: modalIn .25s cubic-bezier(.2,.9,.3,1.2); }
   @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
   .modal-card h2 { font-size: 19px; margin: 4px 0 8px; }
   .modal-card p { color: var(--muted); font-size: 13.5px; margin: 0 0 22px; }
   .modal-buttons { display: flex; flex-direction: column; gap: 10px; }
   .modal-buttons button { width: 100%; padding: 14px; font-size: 15px; }
+
+  /* --- Archive --- */
+  .client-group { margin-bottom: 26px; }
+  .client-heading { font-size: 15px; font-weight: 700; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .client-heading .count { font-size: 11.5px; font-weight: 600; color: var(--muted); background: #f1f2fa; border-radius: 20px; padding: 2px 9px; }
+  .session-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  .session-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+  .session-title { font-size: 14px; font-weight: 600; }
+  .session-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .session-body { margin-top: 14px; }
+  .copy-flash { color: var(--accent); font-weight: 700; }
+  .search-input { max-width: 340px; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="brand"><span class="brand-dot"></span><span style="font-size:12.5px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;">AI Voice Interview</span></div>
-  <h1>Expert Interview Agent</h1>
-  <div class="sub">Just talk — in English or Hindi, whichever's comfortable. The agent listens automatically, transcribes and translates your answers to English, and remembers everything you've said.</div>
+<div class="shell">
+  <div class="sidebar">
+    <div class="brand"><span class="brand-dot"></span><span class="brand-name">Interview Agent</span></div>
+    <button class="nav-btn active" id="navInterview"><span class="nav-icon">●</span>Start interview</button>
+    <button class="nav-btn" id="navArchive"><span class="nav-icon">▤</span>Archive</button>
+  </div>
 
-  <div class="panel" id="setupPanel">
-    <div class="row">
-      <div>
-        <label for="expertName">Expert name</label>
-        <input type="text" id="expertName" placeholder="e.g. Priya Shah" />
+  <div class="content">
+
+    <!-- ============ START INTERVIEW ============ -->
+    <div class="view active" id="view-interview">
+      <h1>Expert Interview Agent</h1>
+      <div class="sub">Just talk — in English or Hindi, whichever's comfortable. The agent listens automatically and translates everything to English behind the scenes.</div>
+
+      <div class="panel" id="setupPanel">
+        <div class="row">
+          <div>
+            <label for="expertName">Expert name</label>
+            <input type="text" id="expertName" placeholder="e.g. Priya Shah" />
+          </div>
+          <div>
+            <label for="projectName">Client project name</label>
+            <input type="text" id="projectName" placeholder="e.g. Acme Logistics Platform" />
+          </div>
+        </div>
+        <details style="margin-top:18px;">
+          <summary>Add extra topics (optional)</summary>
+          <label for="outline">One per line — beyond the standard 24-question framework</label>
+          <textarea id="outline" placeholder="e.g. a particular compliance requirement or stakeholder to ask about"></textarea>
+        </details>
+        <div class="toolbar left">
+          <button class="btn-primary" id="startBtn">Start interview</button>
+        </div>
+        <div class="status" style="text-align:left;" id="setupStatus"></div>
       </div>
-      <div>
-        <label for="projectName">Client project name</label>
-        <input type="text" id="projectName" placeholder="e.g. Acme Logistics Platform" />
+
+      <div class="panel hidden" id="interviewPanel">
+        <div class="orb-stage">
+          <div class="orb-ring"><div class="orb" id="orb" data-state="idle">
+            <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+          </div></div>
+          <div class="orb-caption" id="orbCaption">Getting ready…</div>
+        </div>
+
+        <div class="topic-tag" id="topicTag">Topic</div>
+        <div class="question" id="questionText">Loading question…</div>
+        <div class="status" id="recStatus"></div>
+
+        <div class="toolbar">
+          <button class="btn-secondary hidden" id="stopBtn">I'm done — stop listening</button>
+        </div>
+
+        <div id="answerReview" class="hidden" style="margin-top:14px;">
+          <label>Transcribed answer (edit if needed — moving on automatically)</label>
+          <textarea id="answerText"></textarea>
+          <div class="toolbar">
+            <button class="btn-primary" id="submitAnswerBtn">Continue now</button>
+            <button class="btn-secondary" id="redoBtn">Re-record this answer</button>
+          </div>
+        </div>
+
+        <div class="toolbar" style="margin-top:20px;">
+          <button class="btn-ghost" id="finishBtn">Finish interview</button>
+        </div>
       </div>
-    </div>
-    <details style="margin-top:18px;">
-      <summary>Add extra topics (optional)</summary>
-      <label for="outline">One per line — beyond the standard 24-question framework</label>
-      <textarea id="outline" placeholder="e.g. a particular compliance requirement or stakeholder to ask about"></textarea>
-    </details>
-    <div class="toolbar" style="justify-content:flex-start;">
-      <button class="btn-primary" id="startBtn">Start interview</button>
-    </div>
-    <div class="status" style="text-align:left;" id="setupStatus"></div>
-  </div>
 
-  <div class="panel hidden" id="interviewPanel">
-    <div class="orb-stage">
-      <div class="orb-ring"><div class="orb" id="orb" data-state="idle">
-        <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
-      </div></div>
-      <div class="orb-caption" id="orbCaption">Getting ready…</div>
-    </div>
-
-    <div class="topic-tag" id="topicTag">Topic</div>
-    <div class="question" id="questionText">Loading question…</div>
-    <div class="status" id="recStatus"></div>
-
-    <div class="toolbar">
-      <button class="btn-secondary hidden" id="stopBtn">I'm done — stop listening</button>
-    </div>
-
-    <div id="answerReview" class="hidden" style="margin-top:14px;">
-      <label>Transcribed answer (edit if needed — moving on automatically)</label>
-      <textarea id="answerText"></textarea>
-      <div class="toolbar">
-        <button class="btn-primary" id="submitAnswerBtn">Continue now</button>
-        <button class="btn-secondary" id="redoBtn">Re-record this answer</button>
+      <div class="panel hidden" id="transcriptPanel">
+        <h2 style="font-size:15px; margin:0 0 6px; letter-spacing:-.01em;">Transcript so far</h2>
+        <div id="qaList"></div>
       </div>
     </div>
 
-    <div class="toolbar" style="margin-top:20px;">
-      <button class="btn-ghost" id="finishBtn">Finish interview</button>
-    </div>
-  </div>
+    <!-- ============ ARCHIVE ============ -->
+    <div class="view" id="view-archive">
+      <h1>Archive</h1>
+      <div class="sub">Every finished interview lands here automatically, grouped by client. Open a session to read and copy its case study.</div>
 
-  <div class="panel hidden" id="transcriptPanel">
-    <h2 style="font-size:15px; margin:0 0 6px; letter-spacing:-.01em;">Transcript so far</h2>
-    <div id="qaList"></div>
-  </div>
+      <div class="toolbar left" style="margin-bottom:20px;">
+        <input type="text" class="search-input" id="archiveSearch" placeholder="Search by client or expert name…" />
+        <button class="btn-secondary btn-sm" id="archiveRefreshBtn">Refresh</button>
+      </div>
 
-  <div class="panel hidden" id="wrapPanel">
-    <h2 style="font-size:16px; margin-top:0;">Your case study materials</h2>
-    <div class="status" id="saveStatus"></div>
-    <div class="toolbar">
-      <button class="btn-primary" id="downloadBtn">Download transcript (.json)</button>
-      <button class="btn-secondary" id="genCleanBtn">Clean up transcript</button>
+      <div class="status" style="text-align:left;" id="archiveStatus"></div>
+      <div id="archiveList"></div>
     </div>
-    <div id="docOutput" class="hidden" style="margin-top:16px;"></div>
-    <div class="toolbar hidden" id="docToolbar">
-      <button class="btn-secondary" id="downloadDocBtn">Download this version (.md)</button>
-    </div>
-    <div class="toolbar">
-      <button class="btn-ghost" id="startOverBtn2">Start a new interview</button>
-    </div>
-  </div>
 
-  <div class="panel panel-quiet">
-    <h2 style="font-size:14px; margin:0 0 6px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Find a past session</h2>
-    <div class="row" style="margin-top:12px;">
-      <div><input type="text" id="lookupId" placeholder="Session ID, e.g. 1719000000000-ab12cd" /></div>
-      <div style="flex:0 0 auto;"><button class="btn-secondary" id="lookupBtn">Look up</button></div>
-    </div>
-    <div class="status" style="text-align:left;" id="lookupStatus"></div>
-    <div id="lookupResult" class="hidden" style="margin-top:14px;">
-      <div id="lookupMeta" style="font-size:14px; margin-bottom:10px;"></div>
-      <div class="toolbar" id="lookupToolbar" style="justify-content:flex-start;"></div>
-    </div>
   </div>
 </div>
 
@@ -249,15 +246,13 @@ const state = {
   autoAdvanceTimer: null,
   active: false, // false once Finish is clicked — guards against in-flight requests reviving the UI/mic afterward
   ttsSpeaking: false,
+  sessionId: null,
 };
 
-// Voice-activity detection tuning: how loud counts as "speaking" (0-255
-// scale from the analyser), how long silence has to persist after speech to
-// count as "done answering", and hard caps so a stuck mic can't hang forever.
 const VAD_THRESHOLD = 12;
 const SILENCE_STOP_MS = 1300;
 const MAX_RECORDING_MS = 120000;
-const MAX_SILENT_WAIT_MS = 25000; // give up listening if nothing is ever said
+const MAX_SILENT_WAIT_MS = 25000;
 const AUTO_ADVANCE_MS = 1800;
 
 function setStatus(el, msg, isErr) {
@@ -270,6 +265,29 @@ function setOrb(orbState, caption) {
   if (caption !== undefined) $("orbCaption").innerHTML = caption;
 }
 
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function fetchJSON(url, opts) {
+  const res = await fetch(url, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+// ============ Tab navigation ============
+function showView(name) {
+  $("view-interview").classList.toggle("active", name === "interview");
+  $("view-archive").classList.toggle("active", name === "archive");
+  $("navInterview").classList.toggle("active", name === "interview");
+  $("navArchive").classList.toggle("active", name === "archive");
+  if (name === "archive") loadArchive();
+}
+$("navInterview").addEventListener("click", () => showView("interview"));
+$("navArchive").addEventListener("click", () => showView("archive"));
+
+// ============ Interview flow ============
 function renderTranscript() {
   const list = $("qaList");
   if (!state.history.length) { $("transcriptPanel").classList.add("hidden"); return; }
@@ -281,17 +299,6 @@ function renderTranscript() {
     div.innerHTML = `<div class="qa-q">${escapeHtml(h.question)}</div><div class="qa-a">${escapeHtml(h.answerText)}</div>`;
     list.appendChild(div);
   });
-}
-
-function escapeHtml(s) {
-  return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-async function fetchJSON(url, opts) {
-  const res = await fetch(url, opts);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-  return data;
 }
 
 async function askNextQuestion() {
@@ -307,18 +314,11 @@ async function askNextQuestion() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ extraTopics: state.extraTopics, history: state.history }),
     });
-    if (!state.active) return; // Finish was clicked while this request was in flight
-    if (data.done) {
-      finishInterview();
-      return;
-    }
+    if (!state.active) return;
+    if (data.done) { finishInterview(); return; }
     state.currentQuestion = data;
     $("topicTag").textContent = data.topic || "Question";
     $("questionText").textContent = data.question;
-    // Speak the question and start listening at the same time, instead of
-    // waiting for the read-aloud to finish first — the mic won't pick up a
-    // real answer until the expert actually starts talking anyway, and this
-    // removes several seconds of dead time per question.
     speakQuestion(data.question);
     startListening();
   } catch (err) {
@@ -354,10 +354,6 @@ $("startBtn").addEventListener("click", () => {
 
 let mimeType = "audio/webm";
 
-// Voice-activated recording: starts listening automatically, watches mic
-// volume to detect when the expert starts and stops talking, and stops
-// itself once there's been real silence after real speech. A manual "I'm
-// done" button stays available as a fallback if VAD misjudges a pause.
 async function startListening() {
   try {
     if (!state.micStream) {
@@ -400,8 +396,6 @@ function runVAD() {
     const level = state.ttsSpeaking ? 0 : data.reduce((a, b) => a + b, 0) / data.length;
     const now = Date.now();
 
-    // Reactive orb: scale live with mic volume while listening, like a
-    // voice-assistant blob reacting to your voice in real time.
     const norm = Math.min(1, level / 70);
     orbEl.style.transform = `scale(${1 + norm * 0.28})`;
 
@@ -413,10 +407,7 @@ function runVAD() {
       $("orbCaption").textContent = "Listening… (pause)";
     }
 
-    if (hasSpoken && now - lastLoudAt > SILENCE_STOP_MS) {
-      stopListening();
-      return;
-    }
+    if (hasSpoken && now - lastLoudAt > SILENCE_STOP_MS) { stopListening(); return; }
     if (now - startedAt > MAX_RECORDING_MS) { stopListening(); return; }
     if (!hasSpoken && now - startedAt > MAX_SILENT_WAIT_MS) {
       setStatus($("recStatus"), "Didn't hear anything yet — still listening. Click the button below once you're done, or just start talking.");
@@ -430,9 +421,7 @@ function runVAD() {
 function stopListening() {
   if (state.vadRaf) { cancelAnimationFrame(state.vadRaf); state.vadRaf = null; }
   if (state.audioCtx) { state.audioCtx.close().catch(() => {}); state.audioCtx = null; }
-  if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
-    state.mediaRecorder.stop();
-  }
+  if (state.mediaRecorder && state.mediaRecorder.state === "recording") state.mediaRecorder.stop();
   $("orb").style.transform = "scale(1)";
   $("stopBtn").classList.add("hidden");
 }
@@ -440,7 +429,7 @@ function stopListening() {
 $("stopBtn").addEventListener("click", stopListening);
 
 async function onRecordingStop() {
-  if (!state.active) return; // Finish was clicked — don't transcribe or revive the UI
+  if (!state.active) return;
   state.recordedBlob = new Blob(state.chunks, { type: mimeType });
   setOrb("thinking", "Transcribing…");
   setStatus($("recStatus"), "");
@@ -458,24 +447,13 @@ async function onRecordingStop() {
     setStatus($("recStatus"), "Edit the text or click Continue to go now.");
     scheduleAutoAdvance();
   } catch (err) {
-    if (state.active) {
-      setOrb("idle", "Transcription failed");
-      setStatus($("recStatus"), err.message, true);
-    }
+    if (state.active) { setOrb("idle", "Transcription failed"); setStatus($("recStatus"), err.message, true); }
   }
 }
 
-function scheduleAutoAdvance() {
-  cancelAutoAdvance();
-  state.autoAdvanceTimer = setTimeout(submitAnswer, AUTO_ADVANCE_MS);
-}
+function scheduleAutoAdvance() { cancelAutoAdvance(); state.autoAdvanceTimer = setTimeout(submitAnswer, AUTO_ADVANCE_MS); }
+function cancelAutoAdvance() { if (state.autoAdvanceTimer) { clearTimeout(state.autoAdvanceTimer); state.autoAdvanceTimer = null; } }
 
-function cancelAutoAdvance() {
-  if (state.autoAdvanceTimer) { clearTimeout(state.autoAdvanceTimer); state.autoAdvanceTimer = null; }
-}
-
-// Editing the transcribed text means the expert is actively correcting it —
-// don't auto-advance out from under them.
 $("answerText").addEventListener("input", cancelAutoAdvance);
 
 $("redoBtn").addEventListener("click", () => {
@@ -497,8 +475,6 @@ function blobToBase64(blob) {
 
 $("submitAnswerBtn").addEventListener("click", submitAnswer);
 
-// Pushes whatever's currently in the answer box into state.qa/history, if
-// there is anything pending there. Returns true if it committed an answer.
 async function commitPendingAnswer() {
   cancelAutoAdvance();
   if ($("answerReview").classList.contains("hidden")) return false;
@@ -506,13 +482,7 @@ async function commitPendingAnswer() {
   if (!answerText) return false;
 
   const audioBase64 = state.recordedBlob ? await blobToBase64(state.recordedBlob) : null;
-  const record = {
-    topic: state.currentQuestion.topic,
-    question: state.currentQuestion.question,
-    answerText,
-    audioBase64,
-    mimeType,
-  };
+  const record = { topic: state.currentQuestion.topic, question: state.currentQuestion.question, answerText, audioBase64, mimeType };
   state.qa.push(record);
   state.history.push({ topic: record.topic, question: record.question, answerText });
   renderTranscript();
@@ -531,8 +501,8 @@ async function submitAnswer() {
 }
 
 $("finishBtn").addEventListener("click", async () => {
-  state.active = false; // set immediately so any in-flight request (next question, transcription) becomes a no-op
-  await commitPendingAnswer(); // don't lose an answer sitting in the review box
+  state.active = false;
+  await commitPendingAnswer();
   finishInterview();
 });
 
@@ -542,13 +512,7 @@ async function finishInterview() {
   stopListening();
   if (state.micStream) { state.micStream.getTracks().forEach((t) => t.stop()); state.micStream = null; }
   $("interviewPanel").classList.add("hidden");
-  if (!state.qa.length) {
-    // Nothing recorded — skip straight to the setup screen instead of
-    // showing "generate a case study from nothing".
-    resetToSetup();
-    return;
-  }
-  setStatus($("saveStatus"), "Saving session…");
+  if (!state.qa.length) { resetToSetup(); return; }
   try {
     const data = await fetchJSON("/.netlify/functions/save-session", {
       method: "POST",
@@ -556,9 +520,9 @@ async function finishInterview() {
       body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa }),
     });
     state.sessionId = data.id;
-    setStatus($("saveStatus"), "Saved (session " + data.id + ").");
   } catch (err) {
-    setStatus($("saveStatus"), "Could not save to server storage: " + err.message + " — use Download to keep a local copy.", true);
+    state.sessionId = null;
+    state.saveError = err.message;
   }
   $("finishModal").classList.remove("hidden");
 }
@@ -568,10 +532,29 @@ $("modalStartOverBtn").addEventListener("click", () => {
   resetToSetup();
 });
 
-$("modalCaseStudyBtn").addEventListener("click", () => {
+$("modalCaseStudyBtn").addEventListener("click", async () => {
   $("finishModal").classList.add("hidden");
-  $("wrapPanel").classList.remove("hidden");
-  generateDoc("full");
+  if (!state.sessionId) {
+    // Couldn't save server-side (e.g. Blobs not configured) — fall back to
+    // generating from the in-memory transcript so the expert isn't blocked,
+    // even though it won't be retrievable from the Archive afterward.
+    showView("interview");
+    setStatus($("setupStatus"), "Couldn't save this session to the archive (" + (state.saveError || "unknown error") + "). Generating a one-off case study instead.", true);
+  }
+  const sessionIdToUse = state.sessionId;
+  const capturedQa = state.qa;
+  const capturedExpert = state.expert;
+  const capturedProject = state.project;
+  resetToSetup();
+  showView("archive");
+  await loadArchive();
+  if (sessionIdToUse) {
+    openSession(sessionIdToUse, capturedExpert, capturedProject, true);
+  } else {
+    // No session id: render the case study inline without archive persistence.
+    const md = await generateCaseStudyMarkdown(capturedExpert, capturedProject, capturedQa, null);
+    alert("Session couldn't be archived, but here's the case study:\n\n" + md.slice(0, 4000));
+  }
 });
 
 function resetToSetup() {
@@ -581,103 +564,13 @@ function resetToSetup() {
   state.currentQuestion = null;
   $("qaList").innerHTML = "";
   $("transcriptPanel").classList.add("hidden");
-  $("wrapPanel").classList.add("hidden");
-  $("docOutput").classList.add("hidden");
-  $("docToolbar").classList.add("hidden");
   $("expertName").value = "";
   $("projectName").value = "";
   $("outline").value = "";
   setStatus($("setupStatus"), "");
-  setStatus($("saveStatus"), "");
   $("setupPanel").classList.remove("hidden");
   $("interviewPanel").classList.add("hidden");
 }
-
-$("startOverBtn2").addEventListener("click", resetToSetup);
-
-$("downloadBtn").addEventListener("click", () => {
-  const payload = { expert: state.expert, project: state.project, createdAt: new Date().toISOString(), qa: state.qa.map(({ audioBase64, ...rest }) => rest) };
-  downloadFile(`interview-${slug(state.project)}-${Date.now()}.json`, JSON.stringify(payload, null, 2), "application/json");
-});
-
-async function generateDoc(mode) {
-  const out = $("docOutput");
-  out.classList.remove("hidden");
-  out.textContent = mode === "clean" ? "Cleaning up the transcript…" : "Generating your case study…";
-  try {
-    const data = await fetchJSON("/.netlify/functions/generate-doc", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        expert: state.expert,
-        project: state.project,
-        qa: state.qa,
-        mode,
-        sessionId: state.sessionId || null,
-      }),
-    });
-    out.textContent = data.markdown;
-    state.docMarkdown = data.markdown;
-    state.docMode = mode;
-    $("docToolbar").classList.remove("hidden");
-  } catch (err) {
-    out.textContent = "Failed to generate: " + err.message;
-  }
-}
-
-$("genCleanBtn").addEventListener("click", () => generateDoc("clean"));
-
-$("downloadDocBtn").addEventListener("click", () => {
-  const suffix = state.docMode === "clean" ? "clean" : "case-study";
-  downloadFile(`${suffix}-${slug(state.project)}-${Date.now()}.md`, state.docMarkdown || "", "text/markdown");
-});
-
-// --- Look up a past session by ID (saved automatically at Finish) ---
-$("lookupBtn").addEventListener("click", async () => {
-  const id = $("lookupId").value.trim();
-  const statusEl = $("lookupStatus");
-  const resultEl = $("lookupResult");
-  resultEl.classList.add("hidden");
-  if (!id) { setStatus(statusEl, "Enter a session ID.", true); return; }
-  setStatus(statusEl, "Looking up…");
-  try {
-    const record = await fetchJSON(`/.netlify/functions/list-sessions?id=${encodeURIComponent(id)}`);
-    setStatus(statusEl, "");
-    $("lookupMeta").textContent = `${record.expert} — ${record.project} (${new Date(record.createdAt).toLocaleString()}), ${record.qa.length} answers`;
-    const toolbar = $("lookupToolbar");
-    toolbar.innerHTML = "";
-
-    const addBtn = (label, onClick) => {
-      const b = document.createElement("button");
-      b.className = "btn-secondary";
-      b.textContent = label;
-      b.addEventListener("click", onClick);
-      toolbar.appendChild(b);
-    };
-
-    addBtn("Download transcript (.json)", () => {
-      downloadFile(`interview-${slug(record.project)}-${record.id}.json`, JSON.stringify(record, null, 2), "application/json");
-    });
-    addBtn("Fetch clean transcript (.md)", async () => {
-      try {
-        const res = await fetch(`/.netlify/functions/list-sessions?id=${encodeURIComponent(id)}&doc=clean`);
-        if (!res.ok) throw new Error((await res.json()).error || "Not found — generate it first from a live session, or it hasn't been made yet.");
-        downloadFile(`clean-${slug(record.project)}-${record.id}.md`, await res.text(), "text/markdown");
-      } catch (err) { setStatus(statusEl, err.message, true); }
-    });
-    addBtn("Fetch case study (.md)", async () => {
-      try {
-        const res = await fetch(`/.netlify/functions/list-sessions?id=${encodeURIComponent(id)}&doc=full`);
-        if (!res.ok) throw new Error((await res.json()).error || "Not found — generate it first from a live session, or it hasn't been made yet.");
-        downloadFile(`case-study-${slug(record.project)}-${record.id}.md`, await res.text(), "text/markdown");
-      } catch (err) { setStatus(statusEl, err.message, true); }
-    });
-
-    resultEl.classList.remove("hidden");
-  } catch (err) {
-    setStatus(statusEl, err.message, true);
-  }
-});
 
 function downloadFile(filename, content, type) {
   const blob = new Blob([content], { type });
@@ -687,8 +580,149 @@ function downloadFile(filename, content, type) {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-
 function slug(s) { return String(s || "session").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60) || "session"; }
+
+// ============ Archive ============
+let archiveSessions = []; // [{id, expert, project, createdAt}]
+
+async function loadArchive() {
+  setStatus($("archiveStatus"), "Loading…");
+  try {
+    archiveSessions = await fetchJSON("/.netlify/functions/list-sessions");
+    setStatus($("archiveStatus"), "");
+    renderArchive();
+  } catch (err) {
+    setStatus($("archiveStatus"), "Couldn't load the archive: " + err.message, true);
+    $("archiveList").innerHTML = "";
+  }
+}
+$("archiveRefreshBtn").addEventListener("click", loadArchive);
+$("archiveSearch").addEventListener("input", renderArchive);
+
+function renderArchive() {
+  const list = $("archiveList");
+  const q = $("archiveSearch").value.trim().toLowerCase();
+  const filtered = archiveSessions.filter((s) =>
+    !q || s.project.toLowerCase().includes(q) || s.expert.toLowerCase().includes(q)
+  );
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="status" style="text-align:left;">${archiveSessions.length ? "No sessions match that search." : "No interviews saved yet — finish one from the Start Interview tab."}</div>`;
+    return;
+  }
+
+  const groups = new Map();
+  filtered.forEach((s) => {
+    const key = s.project || "Untitled project";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  });
+
+  list.innerHTML = "";
+  [...groups.keys()].sort((a, b) => a.localeCompare(b)).forEach((client) => {
+    const sessions = groups.get(client).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const group = document.createElement("div");
+    group.className = "client-group";
+    group.innerHTML = `<div class="client-heading">${escapeHtml(client)} <span class="count">${sessions.length}</span></div>`;
+    sessions.forEach((s) => group.appendChild(buildSessionCard(s)));
+    list.appendChild(group);
+  });
+}
+
+function buildSessionCard(s) {
+  const card = document.createElement("div");
+  card.className = "session-card";
+  card.id = "session-" + s.id;
+  const date = new Date(s.createdAt).toLocaleString();
+  card.innerHTML = `
+    <div class="session-head">
+      <div>
+        <div class="session-title">${escapeHtml(s.expert)}</div>
+        <div class="session-meta">${date} · session ${s.id}</div>
+      </div>
+      <button class="btn-secondary btn-sm">View case study</button>
+    </div>
+    <div class="session-body hidden"></div>
+  `;
+  const btn = card.querySelector("button");
+  const body = card.querySelector(".session-body");
+  btn.addEventListener("click", () => {
+    const opening = body.classList.contains("hidden");
+    body.classList.toggle("hidden");
+    btn.textContent = opening ? "Hide" : "View case study";
+    if (opening && !body.dataset.loaded) openSessionBody(s, body);
+  });
+  return card;
+}
+
+async function openSession(id, expert, project, autoScroll) {
+  const card = document.getElementById("session-" + id);
+  if (!card) return;
+  const btn = card.querySelector("button");
+  const body = card.querySelector(".session-body");
+  body.classList.remove("hidden");
+  btn.textContent = "Hide";
+  await openSessionBody({ id, expert, project }, body);
+  if (autoScroll) card.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+async function openSessionBody(s, body) {
+  body.dataset.loaded = "1";
+  body.innerHTML = `<div class="status" style="text-align:left;">Loading case study…</div>`;
+  try {
+    // Try the already-generated case study first.
+    let markdown = null;
+    const res = await fetch(`/.netlify/functions/list-sessions?id=${encodeURIComponent(s.id)}&doc=clean`);
+    if (res.ok) {
+      markdown = await res.text();
+    } else {
+      // Not generated yet — fetch the full record and generate it now.
+      const record = await fetchJSON(`/.netlify/functions/list-sessions?id=${encodeURIComponent(s.id)}`);
+      markdown = await generateCaseStudyMarkdown(record.expert, record.project, record.qa, s.id);
+    }
+    renderSessionBody(body, s, markdown);
+  } catch (err) {
+    body.innerHTML = `<div class="status err" style="text-align:left;">Couldn't load this case study: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function generateCaseStudyMarkdown(expert, project, qa, sessionId) {
+  const data = await fetchJSON("/.netlify/functions/generate-doc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ expert, project, qa, mode: "clean", sessionId }),
+  });
+  return data.markdown;
+}
+
+function renderSessionBody(body, s, markdown) {
+  body.innerHTML = "";
+  const pre = document.createElement("pre");
+  pre.className = "doc-text";
+  pre.textContent = markdown;
+  const toolbar = document.createElement("div");
+  toolbar.className = "toolbar left";
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "btn-primary btn-sm";
+  copyBtn.textContent = "Copy to clipboard";
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(markdown);
+      copyBtn.textContent = "Copied ✓";
+      setTimeout(() => { copyBtn.textContent = "Copy to clipboard"; }, 1800);
+    } catch (e) {
+      copyBtn.textContent = "Copy failed — select text manually";
+    }
+  });
+  const downloadBtn = document.createElement("button");
+  downloadBtn.className = "btn-secondary btn-sm";
+  downloadBtn.textContent = "Download (.md)";
+  downloadBtn.addEventListener("click", () => downloadFile(`case-study-${slug(s.project)}-${s.id}.md`, markdown, "text/markdown"));
+  toolbar.appendChild(copyBtn);
+  toolbar.appendChild(downloadBtn);
+  body.appendChild(toolbar);
+  body.appendChild(pre);
+}
 </script>
 </body>
 </html>
