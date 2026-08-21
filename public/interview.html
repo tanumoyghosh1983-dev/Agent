@@ -338,10 +338,13 @@ function blobToBase64(blob) {
 
 $("submitAnswerBtn").addEventListener("click", submitAnswer);
 
-async function submitAnswer() {
+// Pushes whatever's currently in the answer box into state.qa/history, if
+// there is anything pending there. Returns true if it committed an answer.
+async function commitPendingAnswer() {
   cancelAutoAdvance();
+  if ($("answerReview").classList.contains("hidden")) return false;
   const answerText = $("answerText").value.trim();
-  if (!answerText) { setStatus($("recStatus"), "No speech was heard — click Re-record to try again.", true); return; }
+  if (!answerText) return false;
 
   const audioBase64 = state.recordedBlob ? await blobToBase64(state.recordedBlob) : null;
   const record = {
@@ -358,11 +361,20 @@ async function submitAnswer() {
   $("answerReview").classList.add("hidden");
   $("answerText").value = "";
   state.recordedBlob = null;
+  return true;
+}
+
+async function submitAnswer() {
+  const committed = await commitPendingAnswer();
+  if (!committed) { setStatus($("recStatus"), "No speech was heard — click Re-record to try again.", true); return; }
   setStatus($("recStatus"), "");
   askNextQuestion();
 }
 
-$("finishBtn").addEventListener("click", finishInterview);
+$("finishBtn").addEventListener("click", async () => {
+  await commitPendingAnswer(); // don't lose an answer sitting in the review box
+  finishInterview();
+});
 
 async function finishInterview() {
   cancelAutoAdvance();
