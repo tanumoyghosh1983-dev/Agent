@@ -41,7 +41,7 @@
 <body>
 <div class="wrap">
   <h1>Expert Interview Agent</h1>
-  <div class="sub">Answer out loud. Claude asks the next question (and digs into follow-ups); every answer is transcribed and saved for you.</div>
+  <div class="sub">Just talk. The mic listens automatically after each question, and moves on by itself once you stop speaking — no buttons to click mid-interview.</div>
 
   <div class="panel" id="setupPanel">
     <div class="row">
@@ -72,16 +72,16 @@ Outcome and impact for the client</textarea>
     <div class="question" id="questionText">Loading question…</div>
 
     <div class="toolbar">
-      <button class="btn-record" id="recordBtn">● Record answer</button>
-      <button class="btn-secondary hidden" id="reRecordBtn">Re-record</button>
+      <button class="btn-secondary hidden" id="stopBtn">■ I'm done — stop listening</button>
     </div>
     <div class="status" id="recStatus"></div>
 
     <div id="answerReview" class="hidden" style="margin-top:14px;">
-      <label>Transcribed answer (edit if needed)</label>
+      <label>Transcribed answer (edit if needed — moving on automatically)</label>
       <textarea id="answerText"></textarea>
       <div class="toolbar">
-        <button class="btn-primary" id="submitAnswerBtn">Submit answer & continue</button>
+        <button class="btn-primary" id="submitAnswerBtn">Continue now</button>
+        <button class="btn-secondary" id="redoBtn">Re-record this answer</button>
       </div>
     </div>
 
@@ -117,7 +117,18 @@ const state = {
   qa: [],       // full records incl. audioBase64/mimeType, for saving
   currentQuestion: null,
   mediaRecorder: null, chunks: [], recordedBlob: null,
+  micStream: null, audioCtx: null, analyser: null, vadRaf: null,
+  autoAdvanceTimer: null,
 };
+
+// Voice-activity detection tuning: how loud counts as "speaking" (0-255
+// scale from the analyser), how long silence has to persist after speech to
+// count as "done answering", and hard caps so a stuck mic can't hang forever.
+const VAD_THRESHOLD = 12;
+const SILENCE_STOP_MS = 1800;
+const MAX_RECORDING_MS = 120000;
+const MAX_SILENT_WAIT_MS = 25000; // give up listening if nothing is ever said
+const AUTO_ADVANCE_MS = 4000;
 
 function setStatus(el, msg, isErr) {
   el.textContent = msg || "";
@@ -149,9 +160,11 @@ async function fetchJSON(url, opts) {
 }
 
 async function askNextQuestion() {
+  cancelAutoAdvance();
+  $("answerReview").classList.add("hidden");
+  $("stopBtn").classList.add("hidden");
   setStatus($("recStatus"), "");
   $("questionText").textContent = "Thinking of the next question…";
-  $("recordBtn").disabled = true;
   try {
     const data = await fetchJSON("/.netlify/functions/interview-next-question", {
       method: "POST",
@@ -165,23 +178,23 @@ async function askNextQuestion() {
     state.currentQuestion = data;
     $("topicTag").textContent = data.topic || "Question";
     $("questionText").textContent = data.question;
-    speakQuestion(data.question);
+    speakQuestion(data.question, startListening);
   } catch (err) {
     $("questionText").textContent = "Couldn't load the next question.";
     setStatus($("recStatus"), err.message, true);
-  } finally {
-    $("recordBtn").disabled = false;
   }
 }
 
-function speakQuestion(text) {
+function speakQuestion(text, onDone) {
   try {
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis) { onDone(); return; }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1;
+    u.onend = onDone;
+    u.onerror = onDone;
     window.speechSynthesis.speak(u);
-  } catch (e) { /* optional, ignore failures */ }
+  } catch (e) { onDone(); }
 }
 
 $("startBtn").addEventListener("click", () => {
@@ -196,31 +209,83 @@ $("startBtn").addEventListener("click", () => {
 });
 
 let mimeType = "audio/webm";
-$("recordBtn").addEventListener("click", async () => {
-  const btn = $("recordBtn");
-  if (!state.mediaRecorder || state.mediaRecorder.state === "inactive") {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
-      state.chunks = [];
-      const mr = new MediaRecorder(stream, { mimeType });
-      mr.ondataavailable = (e) => { if (e.data.size) state.chunks.push(e.data); };
-      mr.onstop = onRecordingStop;
-      state.mediaRecorder = mr;
-      mr.start();
-      btn.textContent = "■ Stop recording";
-      btn.classList.add("recording");
-      setStatus($("recStatus"), "Recording… speak your answer, then click Stop.");
-    } catch (err) {
-      setStatus($("recStatus"), "Microphone access denied or unavailable: " + err.message, true);
+
+// Voice-activated recording: starts listening automatically, watches mic
+// volume to detect when the expert starts and stops talking, and stops
+// itself once there's been real silence after real speech. A manual "I'm
+// done" button stays available as a fallback if VAD misjudges a pause.
+async function startListening() {
+  try {
+    if (!state.micStream) {
+      state.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     }
-  } else {
-    state.mediaRecorder.stop();
-    state.mediaRecorder.stream.getTracks().forEach((t) => t.stop());
-    btn.textContent = "● Record answer";
-    btn.classList.remove("recording");
+    mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
+    state.chunks = [];
+    const mr = new MediaRecorder(state.micStream, { mimeType });
+    mr.ondataavailable = (e) => { if (e.data.size) state.chunks.push(e.data); };
+    mr.onstop = onRecordingStop;
+    state.mediaRecorder = mr;
+    mr.start();
+
+    $("stopBtn").classList.remove("hidden");
+    setStatus($("recStatus"), "Listening… start speaking whenever you're ready.");
+    runVAD();
+  } catch (err) {
+    setStatus($("recStatus"), "Microphone access denied or unavailable: " + err.message, true);
   }
-});
+}
+
+function runVAD() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  state.audioCtx = new AudioCtx();
+  const source = state.audioCtx.createMediaStreamSource(state.micStream);
+  state.analyser = state.audioCtx.createAnalyser();
+  state.analyser.fftSize = 512;
+  source.connect(state.analyser);
+  const data = new Uint8Array(state.analyser.frequencyBinCount);
+
+  const startedAt = Date.now();
+  let hasSpoken = false;
+  let lastLoudAt = Date.now();
+
+  const tick = () => {
+    if (!state.mediaRecorder || state.mediaRecorder.state !== "recording") return;
+    state.analyser.getByteFrequencyData(data);
+    const level = data.reduce((a, b) => a + b, 0) / data.length;
+    const now = Date.now();
+
+    if (level > VAD_THRESHOLD) {
+      hasSpoken = true;
+      lastLoudAt = now;
+      setStatus($("recStatus"), "Listening…  (speaking)");
+    } else if (hasSpoken) {
+      setStatus($("recStatus"), "Listening…  (pause)");
+    }
+
+    if (hasSpoken && now - lastLoudAt > SILENCE_STOP_MS) {
+      stopListening();
+      return;
+    }
+    if (now - startedAt > MAX_RECORDING_MS) { stopListening(); return; }
+    if (!hasSpoken && now - startedAt > MAX_SILENT_WAIT_MS) {
+      setStatus($("recStatus"), "Didn't hear anything yet — still listening. Click the button below once you're done, or just start talking.");
+    }
+
+    state.vadRaf = requestAnimationFrame(tick);
+  };
+  state.vadRaf = requestAnimationFrame(tick);
+}
+
+function stopListening() {
+  if (state.vadRaf) { cancelAnimationFrame(state.vadRaf); state.vadRaf = null; }
+  if (state.audioCtx) { state.audioCtx.close().catch(() => {}); state.audioCtx = null; }
+  if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+    state.mediaRecorder.stop();
+  }
+  $("stopBtn").classList.add("hidden");
+}
+
+$("stopBtn").addEventListener("click", stopListening);
 
 async function onRecordingStop() {
   state.recordedBlob = new Blob(state.chunks, { type: mimeType });
@@ -234,11 +299,33 @@ async function onRecordingStop() {
     });
     $("answerText").value = data.text || "";
     $("answerReview").classList.remove("hidden");
-    setStatus($("recStatus"), "Transcribed. Review below, then submit.");
+    setStatus($("recStatus"), "Transcribed. Moving on automatically — edit the text or click Continue to go now.");
+    scheduleAutoAdvance();
   } catch (err) {
     setStatus($("recStatus"), "Transcription failed: " + err.message, true);
   }
 }
+
+function scheduleAutoAdvance() {
+  cancelAutoAdvance();
+  state.autoAdvanceTimer = setTimeout(submitAnswer, AUTO_ADVANCE_MS);
+}
+
+function cancelAutoAdvance() {
+  if (state.autoAdvanceTimer) { clearTimeout(state.autoAdvanceTimer); state.autoAdvanceTimer = null; }
+}
+
+// Editing the transcribed text means the expert is actively correcting it —
+// don't auto-advance out from under them.
+$("answerText").addEventListener("input", cancelAutoAdvance);
+
+$("redoBtn").addEventListener("click", () => {
+  cancelAutoAdvance();
+  $("answerReview").classList.add("hidden");
+  $("answerText").value = "";
+  state.recordedBlob = null;
+  startListening();
+});
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -249,9 +336,12 @@ function blobToBase64(blob) {
   });
 }
 
-$("submitAnswerBtn").addEventListener("click", async () => {
+$("submitAnswerBtn").addEventListener("click", submitAnswer);
+
+async function submitAnswer() {
+  cancelAutoAdvance();
   const answerText = $("answerText").value.trim();
-  if (!answerText) { setStatus($("recStatus"), "Please provide an answer before continuing.", true); return; }
+  if (!answerText) { setStatus($("recStatus"), "No speech was heard — click Re-record to try again.", true); return; }
 
   const audioBase64 = state.recordedBlob ? await blobToBase64(state.recordedBlob) : null;
   const record = {
@@ -270,11 +360,14 @@ $("submitAnswerBtn").addEventListener("click", async () => {
   state.recordedBlob = null;
   setStatus($("recStatus"), "");
   askNextQuestion();
-});
+}
 
 $("finishBtn").addEventListener("click", finishInterview);
 
 async function finishInterview() {
+  cancelAutoAdvance();
+  stopListening();
+  if (state.micStream) { state.micStream.getTracks().forEach((t) => t.stop()); state.micStream = null; }
   $("interviewPanel").classList.add("hidden");
   $("wrapPanel").classList.remove("hidden");
   if (!state.qa.length) { setStatus($("saveStatus"), "No answers recorded yet."); return; }
