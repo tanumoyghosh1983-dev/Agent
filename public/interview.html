@@ -144,10 +144,10 @@ const state = {
 // scale from the analyser), how long silence has to persist after speech to
 // count as "done answering", and hard caps so a stuck mic can't hang forever.
 const VAD_THRESHOLD = 12;
-const SILENCE_STOP_MS = 1800;
+const SILENCE_STOP_MS = 1300;
 const MAX_RECORDING_MS = 120000;
 const MAX_SILENT_WAIT_MS = 25000; // give up listening if nothing is ever said
-const AUTO_ADVANCE_MS = 4000;
+const AUTO_ADVANCE_MS = 1800;
 
 function setStatus(el, msg, isErr) {
   el.textContent = msg || "";
@@ -197,23 +197,33 @@ async function askNextQuestion() {
     state.currentQuestion = data;
     $("topicTag").textContent = data.topic || "Question";
     $("questionText").textContent = data.question;
-    speakQuestion(data.question, startListening);
+    // Speak the question and start listening at the same time, instead of
+    // waiting for the read-aloud to finish first — the mic won't pick up a
+    // real answer until the expert actually starts talking anyway, and this
+    // removes several seconds of dead time per question.
+    speakQuestion(data.question);
+    startListening();
   } catch (err) {
     $("questionText").textContent = "Couldn't load the next question.";
     setStatus($("recStatus"), err.message, true);
   }
 }
 
-function speakQuestion(text, onDone) {
+function speakQuestion(text) {
   try {
-    if (!window.speechSynthesis) { onDone(); return; }
+    if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1;
-    u.onend = onDone;
-    u.onerror = onDone;
+    u.rate = 1.05;
+    // While the question is being read aloud, ignore mic volume for
+    // silence-detection purposes (without headphones the mic can otherwise
+    // pick up the question itself and misfire the "done speaking" check) —
+    // recording still runs the whole time, so an eager answer isn't lost.
+    state.ttsSpeaking = true;
+    u.onend = () => { state.ttsSpeaking = false; };
+    u.onerror = () => { state.ttsSpeaking = false; };
     window.speechSynthesis.speak(u);
-  } catch (e) { onDone(); }
+  } catch (e) { state.ttsSpeaking = false; }
 }
 
 $("startBtn").addEventListener("click", () => {
@@ -270,7 +280,7 @@ function runVAD() {
   const tick = () => {
     if (!state.mediaRecorder || state.mediaRecorder.state !== "recording") return;
     state.analyser.getByteFrequencyData(data);
-    const level = data.reduce((a, b) => a + b, 0) / data.length;
+    const level = state.ttsSpeaking ? 0 : data.reduce((a, b) => a + b, 0) / data.length;
     const now = Date.now();
 
     if (level > VAD_THRESHOLD) {
