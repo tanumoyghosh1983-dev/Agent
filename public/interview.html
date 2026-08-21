@@ -138,6 +138,7 @@ const state = {
   mediaRecorder: null, chunks: [], recordedBlob: null,
   micStream: null, audioCtx: null, analyser: null, vadRaf: null,
   autoAdvanceTimer: null,
+  active: false, // false once Finish is clicked — guards against in-flight requests reviving the UI/mic afterward
 };
 
 // Voice-activity detection tuning: how loud counts as "speaking" (0-255
@@ -190,6 +191,7 @@ async function askNextQuestion() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ outline: state.outline, history: state.history }),
     });
+    if (!state.active) return; // Finish was clicked while this request was in flight
     if (data.done) {
       finishInterview();
       return;
@@ -232,6 +234,7 @@ $("startBtn").addEventListener("click", () => {
   state.outline = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
   if (!state.expert || !state.project) { setStatus($("setupStatus"), "Please fill in expert name and project name.", true); return; }
   if (!state.outline.length) { setStatus($("setupStatus"), "Please list at least one topic.", true); return; }
+  state.active = true;
   $("setupPanel").classList.add("hidden");
   $("interviewPanel").classList.remove("hidden");
   askNextQuestion();
@@ -317,6 +320,7 @@ function stopListening() {
 $("stopBtn").addEventListener("click", stopListening);
 
 async function onRecordingStop() {
+  if (!state.active) return; // Finish was clicked — don't transcribe or revive the UI
   state.recordedBlob = new Blob(state.chunks, { type: mimeType });
   setStatus($("recStatus"), "Transcribing…");
   try {
@@ -326,12 +330,13 @@ async function onRecordingStop() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ audioBase64, mimeType }),
     });
+    if (!state.active) return;
     $("answerText").value = data.text || "";
     $("answerReview").classList.remove("hidden");
     setStatus($("recStatus"), "Transcribed. Moving on automatically — edit the text or click Continue to go now.");
     scheduleAutoAdvance();
   } catch (err) {
-    setStatus($("recStatus"), "Transcription failed: " + err.message, true);
+    if (state.active) setStatus($("recStatus"), "Transcription failed: " + err.message, true);
   }
 }
 
@@ -401,11 +406,13 @@ async function submitAnswer() {
 }
 
 $("finishBtn").addEventListener("click", async () => {
+  state.active = false; // set immediately so any in-flight request (next question, transcription) becomes a no-op
   await commitPendingAnswer(); // don't lose an answer sitting in the review box
   finishInterview();
 });
 
 async function finishInterview() {
+  state.active = false;
   cancelAutoAdvance();
   stopListening();
   if (state.micStream) { state.micStream.getTracks().forEach((t) => t.stop()); state.micStream = null; }

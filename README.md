@@ -190,13 +190,27 @@ netlify/functions/
 |---|---|---|
 | **`OPENAI_API_KEY`** | Yes | Used for Whisper transcription. Same env var the case study agent uses — if that's already set on this Netlify site, this works out of the box. |
 | **`ANTHROPIC_API_KEY`** | Yes | Used for the interviewer (next-question) and the doc-writer agent. Same var the case study agent uses. |
-| **Netlify Blobs** | No setup needed | Enabled automatically on Netlify sites (no extra account, bucket, or credentials) — that's why it was chosen as the default storage backend. |
+| **Netlify Blobs** | Usually no setup needed | Enabled automatically on most Netlify sites/plans — see fallback below if you see a Blobs error. |
 | `OPENAI_TRANSCRIBE_MODEL` | No | Defaults to `whisper-1`. |
 | `ANTHROPIC_MODEL` | No | Defaults to `claude-opus-5` (shared with the case study agent's setting). |
+| `NETLIFY_SITE_ID` + `NETLIFY_BLOBS_TOKEN` | Only if you see a Blobs error | See below. |
 
 Nothing else is required to run this end to end once those two keys are set
 on the Netlify site (Site configuration → Environment variables) — the same
 place the case study agent's keys already live.
+
+### If saving fails with "environment has not been configured to use Netlify Blobs"
+
+On some Netlify plans/deploy setups, Blobs' automatic mode isn't available and
+needs two extra env vars as a manual fallback (downloading a transcript still
+works either way — this only affects server-side auto-save):
+
+1. **`NETLIFY_SITE_ID`** — Site configuration → General → Site details → Site ID (a UUID).
+2. **`NETLIFY_BLOBS_TOKEN`** — a Personal Access Token: user avatar (top right on app.netlify.com) → User settings → Applications → New access token.
+
+Add both as environment variables and redeploy. The interview functions pick
+them up automatically (`netlify/functions/lib/blob-store.js`) — no code
+changes needed.
 
 ## Honest limitations / things worth knowing before you rely on this
 

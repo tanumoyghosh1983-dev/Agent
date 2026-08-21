@@ -14,7 +14,7 @@
 // Uses raw HTTPS against the Anthropic Messages API. Key is server-side only
 // (ANTHROPIC_API_KEY). Model defaults to claude-opus-5.
 
-const { getStore } = require("@netlify/blobs");
+const { openStore } = require("./lib/blob-store");
 
 const FULL_SYSTEM_PROMPT = `You are a technical writer turning an interview transcript with a subject-matter expert into detailed internal documentation about a client project.
 
@@ -140,7 +140,7 @@ exports.handler = async function (event) {
 
     if (sessionId) {
       try {
-        const store = getStore("interview-sessions");
+        const store = openStore();
         await store.set(`${sessionId}-doc-${mode}.md`, markdown);
       } catch (e) {
         // Non-fatal: the browser still has the markdown and can download it,

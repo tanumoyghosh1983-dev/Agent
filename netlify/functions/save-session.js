@@ -8,7 +8,7 @@
 //   <id>.json   -> { id, expert, project, createdAt, qa: [...] } (transcript, no audio)
 //   <id>/answer-<n>.<ext> -> raw audio bytes for that answer (fetched on demand)
 
-const { getStore } = require("@netlify/blobs");
+const { openStore } = require("./lib/blob-store");
 
 exports.handler = async function (event) {
   const headers = {
@@ -39,7 +39,7 @@ exports.handler = async function (event) {
   const createdAt = new Date().toISOString();
 
   try {
-    const store = getStore("interview-sessions");
+    const store = openStore();
 
     // Save each answer's audio separately (blobs are for binary, not JSON),
     // and strip the base64 out of the transcript record we index by.

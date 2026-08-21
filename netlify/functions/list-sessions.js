@@ -5,7 +5,7 @@
 // GET /list-sessions?id=<id>&audio=<audioKey> -> raw audio bytes, base64 JSON
 // GET /list-sessions?id=<id>&doc=clean|full -> that session's saved doc (text/markdown), if generated
 
-const { getStore } = require("@netlify/blobs");
+const { openStore } = require("./lib/blob-store");
 
 exports.handler = async function (event) {
   const headers = {
@@ -19,7 +19,7 @@ exports.handler = async function (event) {
     return { statusCode: 405, headers, body: JSON.stringify({ error: "Method not allowed" }) };
 
   try {
-    const store = getStore("interview-sessions");
+    const store = openStore();
     const params = event.queryStringParameters || {};
 
     if (params.id && params.doc) {
