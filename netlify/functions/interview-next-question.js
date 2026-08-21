@@ -10,17 +10,19 @@
 // zero-dependency serverless-proxy convention. Key is server-side only
 // (ANTHROPIC_API_KEY). Model defaults to claude-opus-5.
 
-const SYSTEM_PROMPT = `You are an experienced documentation interviewer. Your job is to interview a subject-matter expert about a client project so a detailed written case study / internal doc can be built afterward from the transcript. The expert dislikes writing but is comfortable talking, so your questions have to do the work: concrete, specific, one at a time, easy to answer out loud.
+const SYSTEM_PROMPT = `You are an experienced documentation interviewer, live in a real spoken conversation with a subject-matter expert about a client project. A transcript will be built from this afterward. The expert dislikes writing but is comfortable talking, so your questions have to do the work: concrete, specific, one at a time, easy to answer out loud.
 
 You will be given:
-- "outline": a list of topics that must eventually be covered (e.g. "the client and problem", "the technical approach", "obstacles hit", "the outcome/impact").
-- "history": the questions already asked and the expert's answers so far, in order.
+- "outline": topics that should eventually be covered (e.g. "the client and problem", "the technical approach", "obstacles hit", "the outcome/impact"). These are a checklist, not a rigid script - the expert will often answer things out of order or bundle several topics into one answer, the way people actually talk.
+- "history": every question already asked and the expert's answer, in order.
 
-Decide the SINGLE next thing to ask. Two modes:
-1. FOLLOW-UP: if the most recent answer mentioned something specific but underexplained (a tool, a number, a decision, a person, a workaround, a surprising result), ask ONE sharp follow-up question that digs into that specific detail. Prefer this whenever the last answer leaves something concrete on the table — this is how the extra detail gets captured.
-2. NEXT TOPIC: if the current topic feels sufficiently covered (or history is empty), move to the next uncovered topic from "outline" and ask an open, concrete first question about it.
+STEP 1 - before deciding anything, mentally list every concrete fact, name, tool, number, decision, and event the expert has ALREADY told you, across ALL of history, not just the answer under the topic you're about to ask about. Experts frequently answer a later topic while still talking about an earlier one (e.g. they mention what they built while explaining the original problem). Anything already stated anywhere in history counts as already known, regardless of which question it came up under.
 
-When every topic in "outline" has been reasonably covered and there's nothing left worth a follow-up, respond with "done": true instead of a question.
+STEP 2 - decide the SINGLE next thing to ask, in this priority order:
+1. FOLLOW-UP: if the most recent answer mentioned something specific but underexplored (a tool, a number, a decision, a person, a workaround, a surprising result) that ISN'T already covered elsewhere in history, ask ONE sharp follow-up digging into that specific detail. This is how the extra detail gets captured - prefer it whenever the last answer leaves something concrete and new on the table.
+2. NEXT TOPIC: otherwise, look at the outline topics and pick one that still has a real, unanswered gap based on your Step 1 review, not just one whose exact question hasn't been asked yet. If the expert already covered a topic's core content while answering something else, treat that topic as done (or ask only about the specific piece still missing from it) instead of asking its "standard" opening question from scratch.
+
+When every topic is reasonably covered by what's actually in history and there's nothing left worth a follow-up, respond with "done": true instead of a question.
 
 Respond with ONLY valid JSON (no markdown fences, no preamble) in exactly this shape:
 {
@@ -29,10 +31,10 @@ Respond with ONLY valid JSON (no markdown fences, no preamble) in exactly this s
   "question": "the single next question to ask, written as you would say it out loud, one question only, no preamble like 'Great, next...'"
 }
 
-RULES:
+HARD RULES:
+- NEVER ask for a fact, name, number, or description that is already present anywhere in history's answers, even in a different topic's answer, even if worded slightly differently. This is the most common mistake - check twice.
 - Ask ONE question at a time. Never stack multiple questions in one string.
 - Keep questions concrete and answerable from memory: ask for specifics (what, who, when, how, why this and not that) rather than vague prompts like "tell me more".
-- Never repeat a question already asked in history.
 - Keep the question itself under ~40 words.
 - If history is empty, ask a warm, concrete opening question about the FIRST outline topic.
 
@@ -50,7 +52,11 @@ async function callClaude(apiKey, model, outline, history) {
     body: JSON.stringify({
       model,
       max_tokens: 500,
-      output_config: { effort: "low" },
+      // "low" effort was too shallow to reliably cross-check the whole
+      // conversation for facts already mentioned under a different topic,
+      // which caused repeat/redundant questions. "medium" costs a bit more
+      // latency per question but actually reasons about what's known.
+      output_config: { effort: "medium" },
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -124,7 +130,9 @@ exports.handler = async function (event) {
     history = Array.isArray(body.history)
       ? body.history.slice(-30).map((h) => ({
           question: String(h.question || "").slice(0, 500),
-          answer: String(h.answer || "").slice(0, 4000),
+          // The browser sends this field as "answerText" (see public/interview.html);
+          // accept "answer" too in case a caller uses the more natural name.
+          answer: String(h.answerText || h.answer || "").slice(0, 4000),
         }))
       : [];
   } catch (e) {
