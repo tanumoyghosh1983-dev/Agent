@@ -295,11 +295,14 @@
 </div>
 
 <div class="modal-overlay hidden" id="finishModal">
-  <div class="modal-card">
+  <div class="modal-card" style="max-width:480px;">
     <h2>Interview complete</h2>
-    <p>Your answers are saved. What would you like to do next?</p>
+    <p id="modalIntro">Your answers are saved. What would you like to do next?</p>
+    <div id="modalCoverage" class="hidden" style="text-align:left; margin-bottom:18px;"></div>
+    <div id="modalGapNote" class="hidden" style="text-align:left; font-size:13px; color:#8a5a00; background:#fff6ea; border:1px solid #f2d9ab; border-radius:10px; padding:10px 12px; margin-bottom:18px;"></div>
     <div class="modal-buttons">
-      <button class="btn-primary" id="modalCaseStudyBtn">Generate case study</button>
+      <button class="btn-primary hidden" id="modalContinueBtn">Would you like to add more information?</button>
+      <button class="btn-secondary" id="modalCaseStudyBtn">Generate case study</button>
       <button class="btn-secondary" id="modalStartOverBtn">Start over</button>
     </div>
   </div>
@@ -319,6 +322,7 @@ const state = {
   paused: false,
   ttsSpeaking: false,
   sessionId: null,
+  pendingContinuation: null, // gap-analysis response captured at Finish, reused if the expert continues
   industry: "", technologies: "",
   priorContext: "", // summary of what earlier experts already said about this same project
   referenceMaterial: "",
@@ -441,21 +445,22 @@ async function askNextQuestion() {
   }
 }
 
+function coverageOverallPct(coverage) {
+  const vals = Object.values(coverage);
+  return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+}
+
+function coverageBarsHTML(coverage) {
+  return Object.keys(coverage).map((stage) => {
+    const pct = coverage[stage];
+    return `<div class="coverage-row"><div class="coverage-label">${escapeHtml(stage)}</div><div class="coverage-track"><div class="coverage-fill" style="width:${pct}%"></div></div><div class="coverage-pct">${pct}%</div></div>`;
+  }).join("");
+}
+
 function renderCoverage(coverage) {
   state.coverage = coverage;
-  const stages = Object.keys(coverage);
-  const vals = Object.values(coverage);
-  const overall = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
-  $("coverageOverall").textContent = overall + "%";
-  const bars = $("coverageBars");
-  bars.innerHTML = "";
-  stages.forEach((stage) => {
-    const pct = coverage[stage];
-    const row = document.createElement("div");
-    row.className = "coverage-row";
-    row.innerHTML = `<div class="coverage-label">${escapeHtml(stage)}</div><div class="coverage-track"><div class="coverage-fill" style="width:${pct}%"></div></div><div class="coverage-pct">${pct}%</div>`;
-    bars.appendChild(row);
-  });
+  $("coverageOverall").textContent = coverageOverallPct(coverage) + "%";
+  $("coverageBars").innerHTML = coverageBarsHTML(coverage);
   $("coveragePanel").classList.remove("hidden");
 }
 
@@ -815,19 +820,100 @@ async function finishInterview() {
   if (state.micStream) { state.micStream.getTracks().forEach((t) => t.stop()); state.micStream = null; }
   $("interviewPanel").classList.add("hidden");
   if (!state.qa.length) { resetToSetup(); return; }
+
   try {
     const data = await fetchJSON("/.netlify/functions/save-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa, industry: state.industry, technologies: state.technologies }),
+      body: JSON.stringify({
+        expert: state.expert, project: state.project, qa: state.qa,
+        industry: state.industry, technologies: state.technologies,
+        sessionId: state.sessionId || null, // present when continuing a previously-saved session
+      }),
     });
     state.sessionId = data.id;
   } catch (err) {
     state.sessionId = null;
     state.saveError = err.message;
   }
-  $("finishModal").classList.remove("hidden");
+
+  await showFinishReview();
 }
+
+// After Finish, analyze what's actually been covered (reusing the same
+// interview-next-question endpoint, which already estimates per-stage
+// coverage and — if it judges the interview incomplete — hands back the
+// exact next question it would ask, so "add more information" can jump
+// straight into asking it with no extra round trip).
+async function showFinishReview() {
+  $("modalContinueBtn").classList.add("hidden");
+  $("modalGapNote").classList.add("hidden");
+  $("modalCoverage").classList.add("hidden");
+  $("modalIntro").textContent = "Reviewing your interview…";
+  $("finishModal").classList.remove("hidden");
+
+  try {
+    const data = await fetchJSON("/.netlify/functions/interview-next-question", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        extraTopics: state.extraTopics,
+        history: state.history,
+        projectMeta: { industry: state.industry, technologies: state.technologies },
+        priorContext: state.priorContext || null,
+        referenceMaterial: state.referenceMaterial || null,
+      }),
+    });
+    state.pendingContinuation = data;
+
+    if (data.coverage) {
+      $("modalCoverage").innerHTML =
+        `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;"><strong style="font-size:13px;">Interview completeness</strong><span style="font-weight:700; color:var(--accent);">${coverageOverallPct(data.coverage)}%</span></div>` +
+        coverageBarsHTML(data.coverage);
+      $("modalCoverage").classList.remove("hidden");
+    }
+
+    if (!data.done) {
+      $("modalIntro").textContent = "Your answers are saved. This interview still has some light spots.";
+      const weak = data.coverage ? Object.entries(data.coverage).filter(([, pct]) => pct < 70).map(([stage]) => stage) : [];
+      $("modalGapNote").innerHTML = weak.length
+        ? `<strong>Still light on:</strong> ${escapeHtml(weak.join(", "))}`
+        : "The agent has one more good question worth asking before this feels complete.";
+      $("modalGapNote").classList.remove("hidden");
+      $("modalContinueBtn").textContent = "Would you like to add more information?";
+      $("modalContinueBtn").classList.remove("hidden");
+    } else {
+      $("modalIntro").textContent = "Your answers are saved — this interview looks thorough. What would you like to do next?";
+    }
+  } catch (err) {
+    // Analysis failing doesn't block the core Finish flow — just skip the
+    // review and offer the two actions that don't depend on it.
+    state.pendingContinuation = null;
+    $("modalIntro").textContent = "Your answers are saved. What would you like to do next?";
+  }
+}
+
+$("modalContinueBtn").addEventListener("click", () => {
+  $("finishModal").classList.add("hidden");
+  state.active = true;
+  $("interviewPanel").classList.remove("hidden");
+  $("energyBanner").classList.add("hidden");
+
+  const pending = state.pendingContinuation;
+  if (pending && !pending.done && pending.question) {
+    // Already have the next question from the review analysis — use it
+    // directly instead of re-fetching, and it's guaranteed not to re-ask
+    // anything already covered since it came from the same memory-aware logic.
+    state.currentQuestion = pending;
+    $("topicTag").textContent = pending.topic || "Question";
+    $("questionText").textContent = pending.question;
+    if (pending.coverage) renderCoverage(pending.coverage);
+    speakQuestion(pending.question);
+    startListening();
+  } else {
+    askNextQuestion();
+  }
+});
 
 $("modalStartOverBtn").addEventListener("click", () => {
   $("finishModal").classList.add("hidden");
@@ -864,6 +950,7 @@ function resetToSetup() {
   state.history = [];
   state.sessionId = null;
   state.currentQuestion = null;
+  state.pendingContinuation = null;
   state.paused = false;
   state.industry = "";
   state.technologies = "";

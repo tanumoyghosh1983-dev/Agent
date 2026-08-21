@@ -11,6 +11,16 @@
 // without auto-tags (any industry/technologies typed in at setup are kept
 // either way).
 //
+// Supports UPDATING an existing session: if the request includes a
+// "sessionId" for a record that already exists, that same id is reused
+// (instead of minting a new one) and its qa/tags are overwritten with the
+// full, updated set the client sends — this is what powers "add more
+// information to an interview later" (see interview.html's finish-review
+// flow). Any previously generated case study/raw-transcript docs for that
+// session are deleted, since they'd now describe stale content, and
+// hasCaseStudy resets to false so the Dashboard flags it as needing a
+// fresh one.
+//
 // Stored under two keys per session in the "interview-sessions" store:
 //   <id>.json   -> { id, expert, project, createdAt, qa, industry, technologies, tags, hasCaseStudy }
 //   <id>/answer-<n>.<ext> -> raw audio bytes for that answer (fetched on demand)
@@ -82,15 +92,24 @@ exports.handler = async function (event) {
   const industry = String(body.industry || "").slice(0, 100);
   const technologies = String(body.technologies || "").slice(0, 300);
   const qa = Array.isArray(body.qa) ? body.qa : [];
+  const requestedId = body.sessionId ? String(body.sessionId).slice(0, 100) : null;
   if (!qa.length) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "No questions/answers to save." }) };
   }
 
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const createdAt = new Date().toISOString();
-
   try {
     const store = openStore();
+
+    // If continuing an existing session (more info added after the fact),
+    // reuse its id and original createdAt instead of minting a new record.
+    let id = requestedId;
+    let createdAt = new Date().toISOString();
+    let isUpdate = false;
+    if (requestedId) {
+      const existing = await store.get(`${requestedId}.json`, { type: "json" });
+      if (existing) { createdAt = existing.createdAt; isUpdate = true; }
+    }
+    if (!id) id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     // Save each answer's audio separately (blobs are for binary, not JSON),
     // and strip the base64 out of the transcript record we index by.
@@ -131,10 +150,24 @@ exports.handler = async function (event) {
     };
     await store.setJSON(`${id}.json`, record);
 
+    if (isUpdate) {
+      // The transcript just changed — any previously generated case
+      // study/raw-transcript docs now describe stale content. Delete them
+      // so the Archive regenerates fresh ones from the updated transcript
+      // next time they're opened, instead of silently showing old text.
+      try {
+        await store.delete(`${id}-doc-clean.md`);
+        await store.delete(`${id}-doc-full.md`);
+      } catch (e) {
+        // Non-fatal — a stale cached doc getting served once is a much
+        // smaller problem than failing the save itself.
+      }
+    }
+
     return {
       statusCode: 200,
       headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ id, createdAt }),
+      body: JSON.stringify({ id, createdAt, isUpdate }),
     };
   } catch (err) {
     return {
