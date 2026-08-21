@@ -131,6 +131,20 @@
   .session-body { margin-top: 14px; }
   .copy-flash { color: var(--accent); font-weight: 700; }
   .search-input { max-width: 340px; }
+
+  /* --- Dashboard --- */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .stat-tile { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); }
+  .stat-num { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+  .stat-label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
+  .dash-section { margin-bottom: 26px; }
+  .dash-heading { font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+  .client-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; box-shadow: var(--shadow); }
+  .client-row .name { font-weight: 600; font-size: 13.5px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
+  .badge-warn { background: #fff1e6; color: #c2650a; }
+  .badge-ok { background: #e7f8ee; color: #16a34a; }
+  .tag-pill { display: inline-block; background: #f1f2fa; color: var(--muted); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin: 0 6px 6px 0; }
 </style>
 </head>
 <body>
@@ -139,6 +153,7 @@
     <div class="brand"><span class="brand-dot"></span><span class="brand-name">Interview Agent</span></div>
     <button class="nav-btn active" id="navInterview"><span class="nav-icon">●</span>Start interview</button>
     <button class="nav-btn" id="navArchive"><span class="nav-icon">▤</span>Archive</button>
+    <button class="nav-btn" id="navDashboard"><span class="nav-icon">◱</span>Dashboard</button>
   </div>
 
   <div class="content">
@@ -159,6 +174,17 @@
             <input type="text" id="projectName" placeholder="e.g. Acme Logistics Platform" />
           </div>
         </div>
+        <div class="row" style="margin-top:14px;">
+          <div>
+            <label for="industry">Industry (optional)</label>
+            <input type="text" id="industry" placeholder="e.g. Fintech, Healthcare, Logistics" />
+          </div>
+          <div>
+            <label for="technologies">Known technologies (optional, comma-separated)</label>
+            <input type="text" id="technologies" placeholder="e.g. React Native, AWS, Stripe" />
+          </div>
+        </div>
+        <div class="status" style="text-align:left; margin-top:2px;" id="priorContextNote"></div>
         <details style="margin-top:18px;">
           <summary>Add extra topics (optional)</summary>
           <label for="outline">One per line — beyond the standard 24-question framework</label>
@@ -218,12 +244,21 @@
       <div class="sub">Every finished interview lands here automatically, grouped by client. Open a session to read and copy its case study.</div>
 
       <div class="toolbar left" style="margin-bottom:20px;">
-        <input type="text" class="search-input" id="archiveSearch" placeholder="Search by client or expert name…" />
+        <input type="text" class="search-input" id="archiveSearch" placeholder="Search by client, expert, industry, or technology…" />
         <button class="btn-secondary btn-sm" id="archiveRefreshBtn">Refresh</button>
       </div>
 
       <div class="status" style="text-align:left;" id="archiveStatus"></div>
       <div id="archiveList"></div>
+    </div>
+
+    <!-- ============ DASHBOARD ============ -->
+    <div class="view" id="view-dashboard">
+      <h1>Dashboard</h1>
+      <div class="sub">A quick view of interview coverage across clients.</div>
+
+      <div class="status" style="text-align:left;" id="dashboardStatus"></div>
+      <div id="dashboardContent"></div>
     </div>
 
   </div>
@@ -254,6 +289,8 @@ const state = {
   paused: false,
   ttsSpeaking: false,
   sessionId: null,
+  industry: "", technologies: "",
+  priorContext: "", // summary of what earlier experts already said about this same project
 };
 
 const VAD_THRESHOLD = 12;
@@ -287,12 +324,16 @@ async function fetchJSON(url, opts) {
 function showView(name) {
   $("view-interview").classList.toggle("active", name === "interview");
   $("view-archive").classList.toggle("active", name === "archive");
+  $("view-dashboard").classList.toggle("active", name === "dashboard");
   $("navInterview").classList.toggle("active", name === "interview");
   $("navArchive").classList.toggle("active", name === "archive");
+  $("navDashboard").classList.toggle("active", name === "dashboard");
   if (name === "archive") loadArchive();
+  if (name === "dashboard") loadDashboard();
 }
 $("navInterview").addEventListener("click", () => showView("interview"));
 $("navArchive").addEventListener("click", () => showView("archive"));
+$("navDashboard").addEventListener("click", () => showView("dashboard"));
 
 // ============ Interview flow ============
 function renderTranscript() {
@@ -319,7 +360,12 @@ async function askNextQuestion() {
     const data = await fetchJSON("/.netlify/functions/interview-next-question", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extraTopics: state.extraTopics, history: state.history }),
+      body: JSON.stringify({
+        extraTopics: state.extraTopics,
+        history: state.history,
+        projectMeta: { industry: state.industry, technologies: state.technologies },
+        priorContext: state.priorContext || null,
+      }),
     });
     if (!state.active) return;
     if (data.done) { finishInterview(); return; }
@@ -351,6 +397,8 @@ function speakQuestion(text) {
 $("startBtn").addEventListener("click", () => {
   state.expert = $("expertName").value.trim();
   state.project = $("projectName").value.trim();
+  state.industry = $("industry").value.trim();
+  state.technologies = $("technologies").value.trim();
   state.extraTopics = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
   if (!state.expert || !state.project) { setStatus($("setupStatus"), "Please fill in expert name and project name.", true); return; }
   state.active = true;
@@ -358,6 +406,40 @@ $("startBtn").addEventListener("click", () => {
   $("interviewPanel").classList.remove("hidden");
   askNextQuestion();
 });
+
+// ============ Multi-expert projects: detect prior interviews on the same project ============
+// Looks up sessions already in the archive that share this project name and
+// builds a plain-text summary of what was already said, so the agent (via
+// askNextQuestion's priorContext) avoids re-asking that ground and instead
+// probes what THIS expert specifically knows.
+let priorSessionsCache = null; // lazily loaded full session list, refreshed per lookup
+$("projectName").addEventListener("blur", checkForPriorSessions);
+
+async function checkForPriorSessions() {
+  const project = $("projectName").value.trim();
+  const noteEl = $("priorContextNote");
+  state.priorContext = "";
+  if (!project) { noteEl.textContent = ""; return; }
+  noteEl.textContent = "Checking for earlier interviews on this project…";
+  try {
+    priorSessionsCache = await fetchJSON("/.netlify/functions/list-sessions");
+    const matches = priorSessionsCache.filter((s) => s.project.trim().toLowerCase() === project.toLowerCase());
+    if (!matches.length) { noteEl.textContent = ""; return; }
+
+    const records = await Promise.all(
+      matches.map((s) => fetchJSON(`/.netlify/functions/list-sessions?id=${encodeURIComponent(s.id)}`).catch(() => null))
+    );
+    const summaries = records.filter(Boolean).map((r) =>
+      `Interview with ${r.expert}:\n` + r.qa.map((q) => `- ${q.question} -> ${q.answerText}`).join("\n")
+    );
+    state.priorContext = summaries.join("\n\n").slice(0, 8000);
+
+    const experts = [...new Set(matches.map((s) => s.expert))];
+    noteEl.innerHTML = `<span style="color:var(--accent); font-weight:600;">Found ${matches.length} earlier interview${matches.length > 1 ? "s" : ""} on this project</span> (${escapeHtml(experts.join(", "))}) — this session will build on that instead of repeating it.`;
+  } catch (err) {
+    noteEl.textContent = "";
+  }
+}
 
 let mimeType = "audio/webm";
 
@@ -562,7 +644,7 @@ async function finishInterview() {
     const data = await fetchJSON("/.netlify/functions/save-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa }),
+      body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa, industry: state.industry, technologies: state.technologies }),
     });
     state.sessionId = data.id;
   } catch (err) {
@@ -608,11 +690,17 @@ function resetToSetup() {
   state.sessionId = null;
   state.currentQuestion = null;
   state.paused = false;
+  state.industry = "";
+  state.technologies = "";
+  state.priorContext = "";
   $("qaList").innerHTML = "";
   $("transcriptPanel").classList.add("hidden");
   $("expertName").value = "";
   $("projectName").value = "";
+  $("industry").value = "";
+  $("technologies").value = "";
   $("outline").value = "";
+  $("priorContextNote").textContent = "";
   $("pauseBtn").classList.remove("hidden");
   $("resumeBtn").classList.add("hidden");
   $("pausedNotice").classList.add("hidden");
@@ -648,12 +736,16 @@ async function loadArchive() {
 $("archiveRefreshBtn").addEventListener("click", loadArchive);
 $("archiveSearch").addEventListener("input", renderArchive);
 
+function sessionSearchText(s) {
+  const tags = s.tags || {};
+  return [s.project, s.expert, s.industry, s.technologies, ...(tags.industries || []), ...(tags.technologies || []), ...(tags.outcomes || [])]
+    .join(" ").toLowerCase();
+}
+
 function renderArchive() {
   const list = $("archiveList");
   const q = $("archiveSearch").value.trim().toLowerCase();
-  const filtered = archiveSessions.filter((s) =>
-    !q || s.project.toLowerCase().includes(q) || s.expert.toLowerCase().includes(q)
-  );
+  const filtered = archiveSessions.filter((s) => !q || sessionSearchText(s).includes(q));
 
   if (!filtered.length) {
     list.innerHTML = `<div class="status" style="text-align:left;">${archiveSessions.length ? "No sessions match that search." : "No interviews saved yet — finish one from the Start Interview tab."}</div>`;
@@ -688,11 +780,17 @@ function buildSessionCard(s) {
   card.className = "session-card";
   card.id = "session-" + s.id;
   const date = new Date(s.createdAt).toLocaleString();
+  const tags = s.tags || {};
+  const allTags = [...(tags.industries || []), ...(tags.technologies || [])];
+  const tagHtml = allTags.length
+    ? `<div style="margin-top:8px;">${allTags.map((t) => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("")}</div>`
+    : "";
   card.innerHTML = `
     <div class="session-head">
       <div>
         <div class="session-title">${escapeHtml(s.expert)}</div>
         <div class="session-meta">${date} · session ${s.id}</div>
+        ${tagHtml}
       </div>
       <div class="toolbar left" style="margin:0;">
         <button class="btn-secondary btn-sm" data-mode="clean">Raw transcript</button>
@@ -798,10 +896,125 @@ function renderSessionBody(body, s, mode, markdown) {
   downloadBtn.textContent = "Download (.md)";
   const filePrefix = mode === "full" ? "case-study" : "raw-transcript";
   downloadBtn.addEventListener("click", () => downloadFile(`${filePrefix}-${slug(s.project)}-${s.id}.md`, markdown, "text/markdown"));
+
+  // No Google/Notion API credentials are configured for this project, so
+  // there's no true one-click "send" — this does the next best thing:
+  // copies the text and opens a blank Google Doc ready to paste into.
+  const gdocsBtn = document.createElement("button");
+  gdocsBtn.className = "btn-secondary btn-sm";
+  gdocsBtn.textContent = "Open in Google Docs";
+  gdocsBtn.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(markdown); } catch (e) {}
+    window.open("https://docs.new", "_blank");
+    gdocsBtn.textContent = "Copied — paste with ⌘/Ctrl+V";
+    setTimeout(() => { gdocsBtn.textContent = "Open in Google Docs"; }, 2500);
+  });
+
   toolbar.appendChild(copyBtn);
   toolbar.appendChild(downloadBtn);
+  toolbar.appendChild(gdocsBtn);
   body.appendChild(toolbar);
   body.appendChild(pre);
+}
+
+// ============ Dashboard ============
+async function loadDashboard() {
+  setStatus($("dashboardStatus"), "Loading…");
+  try {
+    const sessions = await fetchJSON("/.netlify/functions/list-sessions");
+    setStatus($("dashboardStatus"), "");
+    renderDashboard(sessions);
+  } catch (err) {
+    setStatus($("dashboardStatus"), "Couldn't load dashboard data: " + err.message, true);
+    $("dashboardContent").innerHTML = "";
+  }
+}
+
+function renderDashboard(sessions) {
+  const content = $("dashboardContent");
+  if (!sessions.length) {
+    content.innerHTML = `<div class="status" style="text-align:left;">No interviews yet — stats will appear here once you've finished a few.</div>`;
+    return;
+  }
+
+  const now = new Date();
+  const thisMonth = sessions.filter((s) => {
+    const d = new Date(s.createdAt);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
+
+  const byClient = new Map();
+  sessions.forEach((s) => {
+    const key = s.project || "Untitled project";
+    if (!byClient.has(key)) byClient.set(key, []);
+    byClient.get(key).push(s);
+  });
+  const clientsWithoutCaseStudy = [...byClient.entries()].filter(([, list]) => !list.some((s) => s.hasCaseStudy));
+
+  const tagCounts = new Map();
+  sessions.forEach((s) => {
+    const tags = s.tags || {};
+    [...(tags.industries || []), ...(tags.technologies || [])].forEach((t) => {
+      const key = t.trim();
+      if (!key) return;
+      tagCounts.set(key, (tagCounts.get(key) || 0) + 1);
+    });
+  });
+  const topTags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14);
+
+  content.innerHTML = "";
+
+  const stats = document.createElement("div");
+  stats.className = "stat-grid";
+  const tile = (num, label) => `<div class="stat-tile"><div class="stat-num">${num}</div><div class="stat-label">${label}</div></div>`;
+  stats.innerHTML =
+    tile(sessions.length, "Total interviews") +
+    tile(thisMonth, "This month") +
+    tile(byClient.size, "Clients covered") +
+    tile(clientsWithoutCaseStudy.length, "Clients missing a case study");
+  content.appendChild(stats);
+
+  const gapSection = document.createElement("div");
+  gapSection.className = "dash-section";
+  gapSection.innerHTML = `<div class="dash-heading">Coverage gaps</div>`;
+  if (!clientsWithoutCaseStudy.length) {
+    gapSection.innerHTML += `<div class="status" style="text-align:left;">Every client has at least one generated case study. 🎉</div>`;
+  } else {
+    clientsWithoutCaseStudy.forEach(([client, list]) => {
+      const row = document.createElement("div");
+      row.className = "client-row";
+      row.innerHTML = `<span class="name">${escapeHtml(client)}</span><span class="badge badge-warn">${list.length} interview${list.length > 1 ? "s" : ""}, no case study</span>`;
+      gapSection.appendChild(row);
+    });
+  }
+  content.appendChild(gapSection);
+
+  const clientSection = document.createElement("div");
+  clientSection.className = "dash-section";
+  clientSection.innerHTML = `<div class="dash-heading">All clients</div>`;
+  [...byClient.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([client, list]) => {
+    const covered = list.some((s) => s.hasCaseStudy);
+    const row = document.createElement("div");
+    row.className = "client-row";
+    row.innerHTML = `<span class="name">${escapeHtml(client)}</span><span class="badge ${covered ? "badge-ok" : "badge-warn"}">${list.length} interview${list.length > 1 ? "s" : ""} · ${covered ? "case study ready" : "no case study yet"}</span>`;
+    clientSection.appendChild(row);
+  });
+  content.appendChild(clientSection);
+
+  if (topTags.length) {
+    const tagSection = document.createElement("div");
+    tagSection.className = "dash-section";
+    tagSection.innerHTML = `<div class="dash-heading">Most common industries & technologies</div>`;
+    const pills = document.createElement("div");
+    topTags.forEach(([tag, count]) => {
+      const pill = document.createElement("span");
+      pill.className = "tag-pill";
+      pill.textContent = `${tag} (${count})`;
+      pills.appendChild(pill);
+    });
+    tagSection.appendChild(pills);
+    content.appendChild(tagSection);
+  }
 }
 </script>
 </body>

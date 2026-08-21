@@ -248,3 +248,41 @@ changes needed.
   list/read saved sessions. Fine for an internal, unlisted URL; if this
   needs to be locked down (e.g. Netlify Identity, a shared password gate),
   say so and it can be added.
+
+## Portal layout, tags, dashboard, and multi-expert projects
+
+The tool is now a two/three-tab portal (left sidebar):
+
+- **Start Interview** — just the live interview (setup, orb, questions, live transcript). No archive/download clutter here.
+- **Archive** — every finished session, auto-loaded and grouped by client. Each session has two independently generated views:
+  - **Raw transcript** — grammar-cleaned Q&A, same order, same content.
+  - **Case study** — a narrative write-up (client context / challenge / solution / outcome, no visible questions) built only from what was actually said.
+
+  Both have Copy-to-clipboard, Markdown download, and an "Open in Google Docs" button (copies text + opens a blank Doc to paste into — see the honest limitation below).
+- **Dashboard** — total interviews, interviews this month, clients covered, which clients still have no generated case study, and the most common industries/technologies tagged across all sessions.
+
+**Project metadata & smarter questions.** The setup screen has optional Industry and Technologies fields. When filled in, the interviewer uses them to ask more specific questions (e.g. compliance angles for a named industry, naming a known tool instead of asking "what tech did you use").
+
+**Multi-expert projects.** When you type a project name that already has earlier interview(s) in the archive, the setup screen shows a note and automatically feeds what those earlier experts said into this session as context — the agent won't re-ask anything already covered, and instead focuses on this expert's own role and any gaps the earlier interview(s) left.
+
+**Auto-tagging.** Every saved session gets a quick Claude pass extracting industries/technologies/outcomes actually mentioned, merged with whatever you typed at setup. These power Archive search (searches tags too, not just names) and the Dashboard's tag list.
+
+**Pause / Resume.** Mid-interview, "Pause interview" stops the mic and any question being read aloud (discarding a half-finished recording, never transcribing it); "Resume interview" picks back up on the same question — for an expert stepping away for a client call.
+
+### Honest limitation: "Open in Google Docs" is not a real API integration
+
+There's no OAuth/API credential wired up for Google Docs or Notion in this
+project, so "Open in Google Docs" does the next best thing without one:
+copies the case study text to your clipboard and opens a blank Google Doc
+(`docs.new`) for you to paste into — one extra keystroke, not truly
+one-click. If you want a real one-click "send" (auto-created, auto-titled,
+auto-shared document with no paste step), that needs:
+
+- **Google Docs**: a Google Cloud project with the Docs/Drive API enabled and
+  either a service account (for a single shared destination) or OAuth client
+  credentials (if each user should save to their own Drive).
+- **Notion**: a Notion internal integration token, plus the target database
+  ID shared with that integration.
+
+Say the word and which one matters more, and this can be wired up properly
+once those credentials exist.

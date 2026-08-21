@@ -49,9 +49,11 @@ const SYSTEM_PROMPT = `You are an experienced documentation interviewer, live in
 You will be given:
 - "questionBank": a fixed list of {stage, question} pairs - the core ground this interview needs to cover, roughly in narrative order.
 - "extraTopics": optional additional topics the interviewer added on top of the bank (may be empty).
+- "projectMeta": optional {industry, technologies} the interviewer already knows about this project going in (may be empty/absent). Use it to make questions more specific and informed — e.g. if industry is "Fintech", a question about constraints can specifically ask about compliance/regulatory pressure rather than generic "any constraints?"; if technologies name specific tools, you can ask about them by name instead of "what tech did you use?". Never treat projectMeta as something the expert needs to be asked about again — it's already known.
+- "priorContext": optional summary of what a DIFFERENT expert already said in an earlier interview about this SAME project (may be empty/absent). Treat everything in it as already known — never re-ask for it. Since it's a different person's perspective, prefer questions that get at what THIS expert specifically knows or did that the earlier interview didn't cover (their own role, their own technical decisions, gaps the earlier person couldn't answer) rather than repeating the earlier interview's ground.
 - "history": every question already asked and the expert's answer, in order. The expert may have spoken in English or another language, but every answer here has already been translated to English before it reaches you — always write your questions in English regardless.
 
-STEP 1 - REMEMBER WHAT YOU'VE BEEN TOLD. Before deciding anything, mentally list every concrete fact, name, tool, number, decision, and event the expert has ALREADY told you, across ALL of history, not just the answer to the question it came up under. Experts constantly answer a later question while still talking about an earlier one (e.g. they mention what they built while explaining the original problem, or name the client while describing their role). Anything already stated anywhere in history counts as already known, no matter which question it came up under.
+STEP 1 - REMEMBER WHAT YOU'VE BEEN TOLD. Before deciding anything, mentally list every concrete fact, name, tool, number, decision, and event the expert has ALREADY told you, across ALL of history AND priorContext, not just the answer to the question it came up under. Experts constantly answer a later question while still talking about an earlier one (e.g. they mention what they built while explaining the original problem, or name the client while describing their role). Anything already stated anywhere in history or priorContext counts as already known, no matter which question or which person it came from.
 
 STEP 2 - decide the SINGLE next thing to ask, in this priority order:
 1. FOLLOW-UP: if the most recent answer mentioned something specific but underexplored (a tool, a number, a decision, a person, a workaround, a surprising result) that ISN'T already covered elsewhere in history, ask ONE sharp follow-up digging into that specific detail.
@@ -81,8 +83,8 @@ HARD RULES:
 
 Output ONLY the JSON object.`;
 
-async function callClaude(apiKey, model, extraTopics, history) {
-  const userPayload = JSON.stringify({ questionBank: QUESTION_BANK, extraTopics, history }, null, 2);
+async function callClaude(apiKey, model, extraTopics, history, projectMeta, priorContext) {
+  const userPayload = JSON.stringify({ questionBank: QUESTION_BANK, extraTopics, projectMeta, priorContext, history }, null, 2);
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -164,7 +166,7 @@ exports.handler = async function (event) {
     };
   }
 
-  let extraTopics, history;
+  let extraTopics, history, projectMeta, priorContext;
   try {
     const body = JSON.parse(event.body || "{}");
     // "outline" is accepted as the field name for backward compatibility
@@ -180,6 +182,10 @@ exports.handler = async function (event) {
           answer: String(h.answerText || h.answer || "").slice(0, 4000),
         }))
       : [];
+    projectMeta = body.projectMeta && typeof body.projectMeta === "object"
+      ? { industry: String(body.projectMeta.industry || "").slice(0, 100), technologies: String(body.projectMeta.technologies || "").slice(0, 300) }
+      : null;
+    priorContext = body.priorContext ? String(body.priorContext).slice(0, 8000) : null;
   } catch (e) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid request body" }) };
   }
@@ -187,7 +193,7 @@ exports.handler = async function (event) {
   const model = process.env.ANTHROPIC_MODEL || "claude-opus-5";
 
   try {
-    const plan = parseJSON(await callClaude(apiKey, model, extraTopics, history));
+    const plan = parseJSON(await callClaude(apiKey, model, extraTopics, history, projectMeta, priorContext));
     if (!plan) throw new Error("The interviewer response didn't come through cleanly. Please try again.");
     const out = plan.done
       ? { done: true }

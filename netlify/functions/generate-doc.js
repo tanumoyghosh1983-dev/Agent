@@ -148,6 +148,16 @@ exports.handler = async function (event) {
       try {
         const store = openStore();
         await store.set(`${sessionId}-doc-${mode}.md`, markdown);
+
+        // Flip the "has a case study" flag on the session record so the
+        // Dashboard/Archive can tell which sessions still need one.
+        if (mode === "full") {
+          const record = await store.get(`${sessionId}.json`, { type: "json" });
+          if (record && !record.hasCaseStudy) {
+            record.hasCaseStudy = true;
+            await store.setJSON(`${sessionId}.json`, record);
+          }
+        }
       } catch (e) {
         // Non-fatal: the browser still has the markdown and can download it,
         // even if persisting it to storage failed for some reason.

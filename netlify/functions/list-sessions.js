@@ -54,7 +54,18 @@ exports.handler = async function (event) {
     for (const b of blobs) {
       if (!b.key.endsWith(".json")) continue;
       const record = await store.get(b.key, { type: "json" });
-      if (record) sessions.push({ id: record.id, expert: record.expert, project: record.project, createdAt: record.createdAt });
+      if (record) {
+        sessions.push({
+          id: record.id,
+          expert: record.expert,
+          project: record.project,
+          createdAt: record.createdAt,
+          industry: record.industry || "",
+          technologies: record.technologies || "",
+          tags: record.tags || { industries: [], technologies: [], outcomes: [] },
+          hasCaseStudy: !!record.hasCaseStudy,
+        });
+      }
     }
     sessions.sort((a, c) => (a.createdAt < c.createdAt ? 1 : -1));
 
