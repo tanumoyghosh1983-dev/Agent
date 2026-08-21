@@ -238,7 +238,6 @@
           <textarea id="answerText"></textarea>
           <div class="toolbar">
             <button class="btn-primary" id="submitAnswerBtn">Continue now</button>
-            <button class="btn-secondary" id="redoBtn">Re-record this answer</button>
           </div>
         </div>
 
@@ -739,14 +738,6 @@ function scheduleAutoAdvance() { cancelAutoAdvance(); state.autoAdvanceTimer = s
 function cancelAutoAdvance() { if (state.autoAdvanceTimer) { clearTimeout(state.autoAdvanceTimer); state.autoAdvanceTimer = null; } }
 
 $("answerText").addEventListener("input", cancelAutoAdvance);
-
-$("redoBtn").addEventListener("click", () => {
-  cancelAutoAdvance();
-  $("answerReview").classList.add("hidden");
-  $("answerText").value = "";
-  state.recordedBlob = null;
-  startListening();
-});
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
