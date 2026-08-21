@@ -48,15 +48,12 @@ Output ONLY Markdown in this exact repeating shape, no preamble:
 **A:** cleaned answer text
 `;
 
-async function callClaude(apiKey, model, expert, project, qa, mode, translateToEnglish) {
+async function callClaude(apiKey, model, expert, project, qa, mode) {
   const transcript = qa
     .map((item, i) => `### Q${i + 1} [${item.topic || "general"}]\nQ: ${item.question}\nA: ${item.answerText}`)
     .join("\n\n");
 
-  let systemPrompt = mode === "clean" ? CLEAN_SYSTEM_PROMPT : FULL_SYSTEM_PROMPT;
-  if (translateToEnglish) {
-    systemPrompt += `\n\nLANGUAGE: The transcript's questions/answers may be in Hindi (or a Hindi/English mix). Translate everything into clear, natural English for the output, preserving all facts, numbers, and names exactly — do not translate proper nouns (client names, product names, technology names) if they wouldn't naturally be translated.`;
-  }
+  const systemPrompt = mode === "clean" ? CLEAN_SYSTEM_PROMPT : FULL_SYSTEM_PROMPT;
   const instruction = mode === "clean" ? "Clean up the transcript." : "Write the documentation.";
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -115,14 +112,13 @@ exports.handler = async function (event) {
     };
   }
 
-  let expert, project, qa, mode, sessionId, translateToEnglish;
+  let expert, project, qa, mode, sessionId;
   try {
     const body = JSON.parse(event.body || "{}");
     expert = String(body.expert || "the expert").slice(0, 160);
     project = String(body.project || "the project").slice(0, 160);
     mode = body.mode === "clean" ? "clean" : "full";
     sessionId = body.sessionId ? String(body.sessionId).slice(0, 100) : null;
-    translateToEnglish = !!body.translateToEnglish;
     qa = Array.isArray(body.qa)
       ? body.qa.slice(0, 60).map((q) => ({
           topic: String(q.topic || "").slice(0, 200),
@@ -140,13 +136,12 @@ exports.handler = async function (event) {
   const model = process.env.ANTHROPIC_MODEL || "claude-opus-5";
 
   try {
-    const markdown = await callClaude(apiKey, model, expert, project, qa, mode, translateToEnglish);
+    const markdown = await callClaude(apiKey, model, expert, project, qa, mode);
 
     if (sessionId) {
       try {
         const store = openStore();
-        const suffix = translateToEnglish ? `${mode}-en` : mode;
-        await store.set(`${sessionId}-doc-${suffix}.md`, markdown);
+        await store.set(`${sessionId}-doc-${mode}.md`, markdown);
       } catch (e) {
         // Non-fatal: the browser still has the markdown and can download it,
         // even if persisting it to storage failed for some reason.

@@ -3,7 +3,7 @@
 // and re-open a transcript later. GET /list-sessions -> [{id, expert, project, createdAt}]
 // GET /list-sessions?id=<id> -> full session record (transcript + audio keys)
 // GET /list-sessions?id=<id>&audio=<audioKey> -> raw audio bytes, base64 JSON
-// GET /list-sessions?id=<id>&doc=clean|full|clean-en|full-en -> that session's saved doc (text/markdown), if generated
+// GET /list-sessions?id=<id>&doc=clean|full -> that session's saved doc (text/markdown), if generated
 
 const { openStore } = require("./lib/blob-store");
 
@@ -23,7 +23,7 @@ exports.handler = async function (event) {
     const params = event.queryStringParameters || {};
 
     if (params.id && params.doc) {
-      const mode = /^(clean|full)(-en)?$/.test(params.doc) ? params.doc : "full";
+      const mode = params.doc === "clean" ? "clean" : "full";
       const markdown = await store.get(`${params.id}-doc-${mode}.md`, { type: "text" });
       if (!markdown) return { statusCode: 404, headers, body: JSON.stringify({ error: "No saved doc of that type for this session yet." }) };
       return { statusCode: 200, headers: { ...headers, "Content-Type": "text/markdown" }, body: markdown };

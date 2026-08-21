@@ -1,10 +1,15 @@
 // Netlify Function: transcribe-answer.js
-// Transcribes one recorded answer using the OpenAI Whisper API
-// (audio/transcriptions endpoint). The browser sends the recorded audio blob
-// as base64; this function re-packages it as multipart/form-data (Whisper's
-// API doesn't accept raw base64 or JSON) and returns the plain text.
+// Transcribes (and translates) one recorded answer using OpenAI's Whisper
+// TRANSLATIONS endpoint (audio/translations, not audio/transcriptions). The
+// expert can speak in whatever language they're comfortable in (English,
+// Hindi, or a mix); this endpoint always returns English text, automatically,
+// with no language selection or manual translation step needed anywhere in
+// the app. The browser sends the recorded audio blob as base64; this
+// function re-packages it as multipart/form-data (Whisper's API doesn't
+// accept raw base64 or JSON) and returns the plain English text.
 //
-// Key is server-side only (OPENAI_API_KEY). Model defaults to whisper-1.
+// Key is server-side only (OPENAI_API_KEY). Model defaults to whisper-1
+// (currently the only model OpenAI's translations endpoint supports).
 
 exports.handler = async function (event) {
   const headers = {
@@ -26,15 +31,11 @@ exports.handler = async function (event) {
     };
   }
 
-  let audioBase64, mimeType, language;
+  let audioBase64, mimeType;
   try {
     const body = JSON.parse(event.body || "{}");
     audioBase64 = body.audioBase64;
     mimeType = String(body.mimeType || "audio/webm");
-    // ISO-639-1 hint (e.g. "hi" for Hindi) — Whisper auto-detects language
-    // fine on its own, but a hint measurably improves accuracy, especially
-    // with code-mixed speech (Hindi with English technical terms).
-    language = body.language ? String(body.language).slice(0, 10) : null;
   } catch (e) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid request body" }) };
   }
@@ -61,9 +62,6 @@ exports.handler = async function (event) {
     const boundary = "----ffmnetlifyboundary" + Date.now();
     const parts = [];
     parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\n${model}\r\n`));
-    if (language) {
-      parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n${language}\r\n`));
-    }
     parts.push(
       Buffer.from(
         `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="answer.${ext}"\r\nContent-Type: ${mimeType}\r\n\r\n`
@@ -73,7 +71,7 @@ exports.handler = async function (event) {
     parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
     const multipartBody = Buffer.concat(parts);
 
-    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    const res = await fetch("https://api.openai.com/v1/audio/translations", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,

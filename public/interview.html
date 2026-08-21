@@ -5,45 +5,139 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Expert Interview Agent</title>
 <style>
-  :root { --bg:#0b0b0c; --panel:#161618; --border:#2a2a2d; --text:#f2f2f2; --muted:#9a9a9f; --accent:#2dd4bf; --danger:#ef4444; }
+  :root {
+    --bg: #f4f5fb;
+    --bg-2: #eef0fb;
+    --panel: #ffffff;
+    --border: #e6e8f5;
+    --text: #1b1c2b;
+    --muted: #6b6f8d;
+    --accent: #6d5efc;
+    --accent-2: #38bdf8;
+    --accent-3: #f472b6;
+    --danger: #e0435c;
+    --ok: #16a34a;
+    --shadow: 0 10px 40px rgba(80, 70, 180, 0.08), 0 2px 8px rgba(80, 70, 180, 0.06);
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: -apple-system, Inter, Segoe UI, Arial, sans-serif; background:var(--bg); color:var(--text); }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
-  label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-  input[type=text], textarea, select { width:100%; background:#0f0f11; border:1px solid var(--border); border-radius:8px; color:var(--text); padding:10px 12px; font-size:14px; font-family:inherit; }
-  label.checkbox { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); cursor:pointer; }
-  label.checkbox input { width:auto; margin:0; }
-  textarea { min-height: 90px; resize: vertical; }
-  .row { display:flex; gap:12px; }
-  .row > div { flex:1; }
-  button { cursor:pointer; border:none; border-radius:8px; font-size:14px; padding:10px 16px; font-weight:600; }
-  .btn-primary { background: var(--accent); color:#062; }
-  .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
-  .btn-secondary { background:#232326; color:var(--text); border:1px solid var(--border); }
-  .btn-record { background: var(--danger); color:#fff; }
-  .btn-record.recording { animation: pulse 1.2s infinite; }
-  @keyframes pulse { 0%{opacity:1;} 50%{opacity:.55;} 100%{opacity:1;} }
-  .question { font-size: 18px; line-height:1.5; margin: 4px 0 16px; }
-  .topic-tag { display:inline-block; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--accent); background:#0f2b27; border-radius:5px; padding:3px 8px; margin-bottom:10px; }
-  .qa-item { border-bottom:1px solid var(--border); padding: 14px 0; }
-  .qa-item:last-child { border-bottom:none; }
-  .qa-q { font-weight:600; font-size:14px; margin-bottom:4px; }
-  .qa-a { color:#d0d0d3; font-size:14px; white-space:pre-wrap; }
-  .status { font-size:13px; color: var(--muted); min-height: 18px; margin-top: 8px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Inter", "Segoe UI", Arial, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(1100px 500px at 15% -10%, #e3e6ff 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #dcf4ff 0%, transparent 55%),
+      var(--bg);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 48px 20px 90px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 12px rgba(109,94,252,.5); }
+  h1 { font-size: 26px; margin: 0; font-weight: 700; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 14.5px; margin: 10px 0 32px; line-height: 1.5; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .panel-quiet { background: transparent; border: 1px dashed var(--border); box-shadow: none; }
+  label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 7px; }
+  input[type=text], textarea {
+    width: 100%; background: #fbfbff; border: 1.5px solid var(--border); border-radius: 12px;
+    color: var(--text); padding: 12px 14px; font-size: 14.5px; font-family: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input[type=text]:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(109,94,252,.12); }
+  textarea { min-height: 84px; resize: vertical; }
+  .row { display: flex; gap: 14px; }
+  .row > div { flex: 1; }
+  button {
+    cursor: pointer; border: none; border-radius: 12px; font-size: 14.5px; padding: 12px 20px;
+    font-weight: 600; font-family: inherit; transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+  }
+  button:active { transform: scale(.97); }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), #8b7cff); color: #fff; box-shadow: 0 6px 20px rgba(109,94,252,.35); }
+  .btn-primary:hover { box-shadow: 0 8px 26px rgba(109,94,252,.45); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+  .btn-secondary { background: #f1f2fa; color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: #e9ebfa; }
+  .btn-ghost { background: transparent; color: var(--muted); padding: 8px 14px; }
+  .btn-ghost:hover { color: var(--text); }
+  .topic-tag {
+    display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--accent); background: #efedff; border-radius: 6px; padding: 4px 10px; margin-bottom: 14px;
+  }
+  .question { font-size: 20px; line-height: 1.5; font-weight: 600; margin: 0 0 6px; text-align: center; min-height: 1.6em; }
+  .qa-item { border-bottom: 1px solid var(--border); padding: 14px 0; }
+  .qa-item:last-child { border-bottom: none; }
+  .qa-q { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; color: var(--text); }
+  .qa-a { color: var(--muted); font-size: 13.5px; white-space: pre-wrap; }
+  .status { font-size: 13.5px; color: var(--muted); min-height: 20px; margin-top: 4px; text-align: center; }
   .status.err { color: var(--danger); }
-  .hidden { display:none !important; }
-  a.link-btn { color: var(--accent); text-decoration:none; font-size:13px; }
-  #docOutput { white-space: pre-wrap; font-size: 13.5px; line-height:1.55; background:#0f0f11; border:1px solid var(--border); border-radius:8px; padding:16px; max-height: 480px; overflow:auto; }
-  .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
+  .hidden { display: none !important; }
+  #docOutput { white-space: pre-wrap; font-size: 13.5px; line-height: 1.6; background: #fbfbff; border: 1px solid var(--border); border-radius: 14px; padding: 18px; max-height: 480px; overflow: auto; }
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; justify-content: center; }
+  details > summary { cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 6px; }
+  details[open] > summary { margin-bottom: 12px; }
+
+  /* --- The orb: a Siri-style animated blob that shows agent state --- */
+  .orb-stage { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 8px 0 28px; }
+  .orb-ring {
+    width: 168px; height: 168px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 20px 50px rgba(109,94,252,.18);
+    background: #fff;
+  }
+  .orb {
+    position: relative; width: 140px; height: 140px; border-radius: 50%;
+    overflow: hidden; background: #f7f7ff;
+    transform: scale(1); transition: transform .09s ease-out;
+  }
+  .orb .blob {
+    position: absolute; width: 120%; height: 120%; top: -10%; left: -10%;
+    border-radius: 46%; filter: blur(14px); opacity: .85;
+    animation: blobSpin 9s linear infinite;
+  }
+  .orb .blob.b1 { background: radial-gradient(circle at 30% 30%, var(--accent), transparent 60%); animation-duration: 7s; }
+  .orb .blob.b2 { background: radial-gradient(circle at 70% 40%, var(--accent-2), transparent 60%); animation-duration: 10s; animation-direction: reverse; }
+  .orb .blob.b3 { background: radial-gradient(circle at 50% 70%, var(--accent-3), transparent 60%); animation-duration: 12s; }
+  @keyframes blobSpin { from { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.12); } to { transform: rotate(360deg) scale(1); } }
+
+  .orb[data-state="idle"] .blob { animation-play-state: paused; opacity: .5; }
+  .orb[data-state="thinking"] .blob { animation-duration: 2.2s !important; }
+  .orb[data-state="speaking"] .blob { animation-duration: 3.5s !important; }
+  .orb[data-state="listening"] .blob { animation-duration: 4.5s !important; }
+  .orb[data-state="done"] .blob { animation-play-state: paused; opacity: .35; }
+
+  .orb-caption { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .02em; min-height: 18px; }
+  .pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: dotPulse 1.4s ease-in-out infinite; vertical-align: middle; }
+  @keyframes dotPulse { 0%,100% { opacity: .3; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+
+  /* --- Modal --- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(27,28,43,.35); backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .modal-card {
+    background: var(--panel); border-radius: 22px; padding: 34px; max-width: 420px; width: 100%;
+    box-shadow: 0 30px 80px rgba(30,20,80,.25); text-align: center;
+    animation: modalIn .25s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .modal-card h2 { font-size: 19px; margin: 4px 0 8px; }
+  .modal-card p { color: var(--muted); font-size: 13.5px; margin: 0 0 22px; }
+  .modal-buttons { display: flex; flex-direction: column; gap: 10px; }
+  .modal-buttons button { width: 100%; padding: 14px; font-size: 15px; }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <div class="brand"><span class="brand-dot"></span><span style="font-size:12.5px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;">AI Voice Interview</span></div>
   <h1>Expert Interview Agent</h1>
-  <div class="sub">Just talk. The mic listens automatically after each question, and moves on by itself once you stop speaking — no buttons to click mid-interview.</div>
+  <div class="sub">Just talk — in English or Hindi, whichever's comfortable. The agent listens automatically, transcribes and translates your answers to English, and remembers everything you've said.</div>
 
   <div class="panel" id="setupPanel">
     <div class="row">
@@ -56,32 +150,32 @@
         <input type="text" id="projectName" placeholder="e.g. Acme Logistics Platform" />
       </div>
     </div>
-    <div style="margin-top:14px;">
-      <label for="language">Language the expert will speak</label>
-      <select id="language">
-        <option value="en">English</option>
-        <option value="hi">Hindi (हिन्दी)</option>
-      </select>
-    </div>
-    <div class="sub" style="margin:14px 0 0;">Runs through a fixed 24-question interview framework covering client context, the problem, what things looked like before, complexity, the solution, technical decisions, and impact — in whatever order fits the conversation, skipping anything already answered.</div>
-    <div style="margin-top:14px;">
-      <label for="outline">Extra topics to also cover (optional, one per line)</label>
-      <textarea id="outline" placeholder="Only if there's something specific beyond the standard framework, e.g. a particular compliance requirement or stakeholder to ask about"></textarea>
-    </div>
-    <div class="toolbar">
+    <details style="margin-top:18px;">
+      <summary>Add extra topics (optional)</summary>
+      <label for="outline">One per line — beyond the standard 24-question framework</label>
+      <textarea id="outline" placeholder="e.g. a particular compliance requirement or stakeholder to ask about"></textarea>
+    </details>
+    <div class="toolbar" style="justify-content:flex-start;">
       <button class="btn-primary" id="startBtn">Start interview</button>
     </div>
-    <div class="status" id="setupStatus"></div>
+    <div class="status" style="text-align:left;" id="setupStatus"></div>
   </div>
 
   <div class="panel hidden" id="interviewPanel">
+    <div class="orb-stage">
+      <div class="orb-ring"><div class="orb" id="orb" data-state="idle">
+        <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+      </div></div>
+      <div class="orb-caption" id="orbCaption">Getting ready…</div>
+    </div>
+
     <div class="topic-tag" id="topicTag">Topic</div>
     <div class="question" id="questionText">Loading question…</div>
+    <div class="status" id="recStatus"></div>
 
     <div class="toolbar">
-      <button class="btn-secondary hidden" id="stopBtn">■ I'm done — stop listening</button>
+      <button class="btn-secondary hidden" id="stopBtn">I'm done — stop listening</button>
     </div>
-    <div class="status" id="recStatus"></div>
 
     <div id="answerReview" class="hidden" style="margin-top:14px;">
       <label>Transcribed answer (edit if needed — moving on automatically)</label>
@@ -92,49 +186,53 @@
       </div>
     </div>
 
-    <div class="toolbar" style="margin-top:18px;">
-      <button class="btn-secondary" id="finishBtn">Finish interview now</button>
+    <div class="toolbar" style="margin-top:20px;">
+      <button class="btn-ghost" id="finishBtn">Finish interview</button>
     </div>
   </div>
 
   <div class="panel hidden" id="transcriptPanel">
-    <h2 style="font-size:16px; margin-top:0;">Transcript so far</h2>
+    <h2 style="font-size:15px; margin:0 0 6px; letter-spacing:-.01em;">Transcript so far</h2>
     <div id="qaList"></div>
   </div>
 
   <div class="panel hidden" id="wrapPanel">
-    <h2 style="font-size:16px; margin-top:0;">Interview complete</h2>
+    <h2 style="font-size:16px; margin-top:0;">Your case study materials</h2>
     <div class="status" id="saveStatus"></div>
     <div class="toolbar">
       <button class="btn-primary" id="downloadBtn">Download transcript (.json)</button>
       <button class="btn-secondary" id="genCleanBtn">Clean up transcript</button>
-      <button class="btn-secondary" id="genDocBtn">Generate full documentation draft</button>
     </div>
-    <label class="checkbox hidden" id="translateRow" style="margin-top:10px;">
-      <input type="checkbox" id="translateCheckbox" />
-      Translate the generated doc into English
-    </label>
     <div id="docOutput" class="hidden" style="margin-top:16px;"></div>
     <div class="toolbar hidden" id="docToolbar">
       <button class="btn-secondary" id="downloadDocBtn">Download this version (.md)</button>
     </div>
+    <div class="toolbar">
+      <button class="btn-ghost" id="startOverBtn2">Start a new interview</button>
+    </div>
   </div>
 
-  <div class="panel">
-    <h2 style="font-size:16px; margin-top:0;">Find a past session</h2>
-    <div class="sub" style="margin-bottom:12px;">Every finished session is saved automatically. Look one up by its session ID (shown after you finish an interview) to re-download its transcript or generated docs.</div>
-    <div class="row">
-      <div>
-        <input type="text" id="lookupId" placeholder="Session ID, e.g. 1719000000000-ab12cd" />
-      </div>
-      <div style="flex:0 0 auto;">
-        <button class="btn-secondary" id="lookupBtn">Look up</button>
-      </div>
+  <div class="panel panel-quiet">
+    <h2 style="font-size:14px; margin:0 0 6px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Find a past session</h2>
+    <div class="row" style="margin-top:12px;">
+      <div><input type="text" id="lookupId" placeholder="Session ID, e.g. 1719000000000-ab12cd" /></div>
+      <div style="flex:0 0 auto;"><button class="btn-secondary" id="lookupBtn">Look up</button></div>
     </div>
-    <div class="status" id="lookupStatus"></div>
+    <div class="status" style="text-align:left;" id="lookupStatus"></div>
     <div id="lookupResult" class="hidden" style="margin-top:14px;">
       <div id="lookupMeta" style="font-size:14px; margin-bottom:10px;"></div>
-      <div class="toolbar" id="lookupToolbar"></div>
+      <div class="toolbar" id="lookupToolbar" style="justify-content:flex-start;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="finishModal">
+  <div class="modal-card">
+    <h2>Interview complete</h2>
+    <p>Your answers are saved. What would you like to do next?</p>
+    <div class="modal-buttons">
+      <button class="btn-primary" id="modalCaseStudyBtn">Generate case study</button>
+      <button class="btn-secondary" id="modalStartOverBtn">Start over</button>
     </div>
   </div>
 </div>
@@ -142,7 +240,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const state = {
-  expert: "", project: "", extraTopics: [], language: "en",
+  expert: "", project: "", extraTopics: [],
   history: [], // {topic, question, answerText}
   qa: [],       // full records incl. audioBase64/mimeType, for saving
   currentQuestion: null,
@@ -150,6 +248,7 @@ const state = {
   micStream: null, audioCtx: null, analyser: null, vadRaf: null,
   autoAdvanceTimer: null,
   active: false, // false once Finish is clicked — guards against in-flight requests reviving the UI/mic afterward
+  ttsSpeaking: false,
 };
 
 // Voice-activity detection tuning: how loud counts as "speaking" (0-255
@@ -164,6 +263,11 @@ const AUTO_ADVANCE_MS = 1800;
 function setStatus(el, msg, isErr) {
   el.textContent = msg || "";
   el.classList.toggle("err", !!isErr);
+}
+
+function setOrb(orbState, caption) {
+  $("orb").dataset.state = orbState;
+  if (caption !== undefined) $("orbCaption").innerHTML = caption;
 }
 
 function renderTranscript() {
@@ -195,12 +299,13 @@ async function askNextQuestion() {
   $("answerReview").classList.add("hidden");
   $("stopBtn").classList.add("hidden");
   setStatus($("recStatus"), "");
-  $("questionText").textContent = "Thinking of the next question…";
+  setOrb("thinking", "Thinking of the next question…");
+  $("questionText").textContent = "…";
   try {
     const data = await fetchJSON("/.netlify/functions/interview-next-question", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extraTopics: state.extraTopics, history: state.history, language: state.language }),
+      body: JSON.stringify({ extraTopics: state.extraTopics, history: state.history }),
     });
     if (!state.active) return; // Finish was clicked while this request was in flight
     if (data.done) {
@@ -218,6 +323,7 @@ async function askNextQuestion() {
     startListening();
   } catch (err) {
     $("questionText").textContent = "Couldn't load the next question.";
+    setOrb("idle", "Something went wrong");
     setStatus($("recStatus"), err.message, true);
   }
 }
@@ -228,19 +334,6 @@ function speakQuestion(text) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.05;
-    if (state.language === "hi") {
-      u.lang = "hi-IN";
-      // Prefer an actual Hindi voice if the browser/OS has one installed;
-      // otherwise fall back to the system default voice reading Devanagari
-      // text as best it can (works, just may sound off).
-      const voices = window.speechSynthesis.getVoices();
-      const hiVoice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("hi"));
-      if (hiVoice) u.voice = hiVoice;
-    }
-    // While the question is being read aloud, ignore mic volume for
-    // silence-detection purposes (without headphones the mic can otherwise
-    // pick up the question itself and misfire the "done speaking" check) —
-    // recording still runs the whole time, so an eager answer isn't lost.
     state.ttsSpeaking = true;
     u.onend = () => { state.ttsSpeaking = false; };
     u.onerror = () => { state.ttsSpeaking = false; };
@@ -252,12 +345,10 @@ $("startBtn").addEventListener("click", () => {
   state.expert = $("expertName").value.trim();
   state.project = $("projectName").value.trim();
   state.extraTopics = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
-  state.language = $("language").value === "hi" ? "hi" : "en";
   if (!state.expert || !state.project) { setStatus($("setupStatus"), "Please fill in expert name and project name.", true); return; }
   state.active = true;
   $("setupPanel").classList.add("hidden");
   $("interviewPanel").classList.remove("hidden");
-  if (state.language === "hi") $("translateRow").classList.remove("hidden");
   askNextQuestion();
 });
 
@@ -281,9 +372,10 @@ async function startListening() {
     mr.start();
 
     $("stopBtn").classList.remove("hidden");
-    setStatus($("recStatus"), "Listening… start speaking whenever you're ready.");
+    setOrb("listening", "Listening — start speaking whenever you're ready");
     runVAD();
   } catch (err) {
+    setOrb("idle", "Microphone unavailable");
     setStatus($("recStatus"), "Microphone access denied or unavailable: " + err.message, true);
   }
 }
@@ -296,6 +388,7 @@ function runVAD() {
   state.analyser.fftSize = 512;
   source.connect(state.analyser);
   const data = new Uint8Array(state.analyser.frequencyBinCount);
+  const orbEl = $("orb");
 
   const startedAt = Date.now();
   let hasSpoken = false;
@@ -307,12 +400,17 @@ function runVAD() {
     const level = state.ttsSpeaking ? 0 : data.reduce((a, b) => a + b, 0) / data.length;
     const now = Date.now();
 
+    // Reactive orb: scale live with mic volume while listening, like a
+    // voice-assistant blob reacting to your voice in real time.
+    const norm = Math.min(1, level / 70);
+    orbEl.style.transform = `scale(${1 + norm * 0.28})`;
+
     if (level > VAD_THRESHOLD) {
       hasSpoken = true;
       lastLoudAt = now;
-      setStatus($("recStatus"), "Listening…  (speaking)");
+      $("orbCaption").innerHTML = '<span class="pulse-dot"></span>Listening…';
     } else if (hasSpoken) {
-      setStatus($("recStatus"), "Listening…  (pause)");
+      $("orbCaption").textContent = "Listening… (pause)";
     }
 
     if (hasSpoken && now - lastLoudAt > SILENCE_STOP_MS) {
@@ -335,6 +433,7 @@ function stopListening() {
   if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
     state.mediaRecorder.stop();
   }
+  $("orb").style.transform = "scale(1)";
   $("stopBtn").classList.add("hidden");
 }
 
@@ -343,21 +442,26 @@ $("stopBtn").addEventListener("click", stopListening);
 async function onRecordingStop() {
   if (!state.active) return; // Finish was clicked — don't transcribe or revive the UI
   state.recordedBlob = new Blob(state.chunks, { type: mimeType });
-  setStatus($("recStatus"), "Transcribing…");
+  setOrb("thinking", "Transcribing…");
+  setStatus($("recStatus"), "");
   try {
     const audioBase64 = await blobToBase64(state.recordedBlob);
     const data = await fetchJSON("/.netlify/functions/transcribe-answer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioBase64, mimeType, language: state.language }),
+      body: JSON.stringify({ audioBase64, mimeType }),
     });
     if (!state.active) return;
     $("answerText").value = data.text || "";
     $("answerReview").classList.remove("hidden");
-    setStatus($("recStatus"), "Transcribed. Moving on automatically — edit the text or click Continue to go now.");
+    setOrb("idle", "Got it — moving on automatically");
+    setStatus($("recStatus"), "Edit the text or click Continue to go now.");
     scheduleAutoAdvance();
   } catch (err) {
-    if (state.active) setStatus($("recStatus"), "Transcription failed: " + err.message, true);
+    if (state.active) {
+      setOrb("idle", "Transcription failed");
+      setStatus($("recStatus"), err.message, true);
+    }
   }
 }
 
@@ -438,8 +542,12 @@ async function finishInterview() {
   stopListening();
   if (state.micStream) { state.micStream.getTracks().forEach((t) => t.stop()); state.micStream = null; }
   $("interviewPanel").classList.add("hidden");
-  $("wrapPanel").classList.remove("hidden");
-  if (!state.qa.length) { setStatus($("saveStatus"), "No answers recorded yet."); return; }
+  if (!state.qa.length) {
+    // Nothing recorded — skip straight to the setup screen instead of
+    // showing "generate a case study from nothing".
+    resetToSetup();
+    return;
+  }
   setStatus($("saveStatus"), "Saving session…");
   try {
     const data = await fetchJSON("/.netlify/functions/save-session", {
@@ -452,7 +560,40 @@ async function finishInterview() {
   } catch (err) {
     setStatus($("saveStatus"), "Could not save to server storage: " + err.message + " — use Download to keep a local copy.", true);
   }
+  $("finishModal").classList.remove("hidden");
 }
+
+$("modalStartOverBtn").addEventListener("click", () => {
+  $("finishModal").classList.add("hidden");
+  resetToSetup();
+});
+
+$("modalCaseStudyBtn").addEventListener("click", () => {
+  $("finishModal").classList.add("hidden");
+  $("wrapPanel").classList.remove("hidden");
+  generateDoc("full");
+});
+
+function resetToSetup() {
+  state.qa = [];
+  state.history = [];
+  state.sessionId = null;
+  state.currentQuestion = null;
+  $("qaList").innerHTML = "";
+  $("transcriptPanel").classList.add("hidden");
+  $("wrapPanel").classList.add("hidden");
+  $("docOutput").classList.add("hidden");
+  $("docToolbar").classList.add("hidden");
+  $("expertName").value = "";
+  $("projectName").value = "";
+  $("outline").value = "";
+  setStatus($("setupStatus"), "");
+  setStatus($("saveStatus"), "");
+  $("setupPanel").classList.remove("hidden");
+  $("interviewPanel").classList.add("hidden");
+}
+
+$("startOverBtn2").addEventListener("click", resetToSetup);
 
 $("downloadBtn").addEventListener("click", () => {
   const payload = { expert: state.expert, project: state.project, createdAt: new Date().toISOString(), qa: state.qa.map(({ audioBase64, ...rest }) => rest) };
@@ -462,7 +603,7 @@ $("downloadBtn").addEventListener("click", () => {
 async function generateDoc(mode) {
   const out = $("docOutput");
   out.classList.remove("hidden");
-  out.textContent = mode === "clean" ? "Cleaning up the transcript…" : "Generating documentation draft…";
+  out.textContent = mode === "clean" ? "Cleaning up the transcript…" : "Generating your case study…";
   try {
     const data = await fetchJSON("/.netlify/functions/generate-doc", {
       method: "POST",
@@ -473,7 +614,6 @@ async function generateDoc(mode) {
         qa: state.qa,
         mode,
         sessionId: state.sessionId || null,
-        translateToEnglish: $("translateCheckbox").checked,
       }),
     });
     out.textContent = data.markdown;
@@ -486,10 +626,9 @@ async function generateDoc(mode) {
 }
 
 $("genCleanBtn").addEventListener("click", () => generateDoc("clean"));
-$("genDocBtn").addEventListener("click", () => generateDoc("full"));
 
 $("downloadDocBtn").addEventListener("click", () => {
-  const suffix = state.docMode === "clean" ? "clean" : "doc";
+  const suffix = state.docMode === "clean" ? "clean" : "case-study";
   downloadFile(`${suffix}-${slug(state.project)}-${Date.now()}.md`, state.docMarkdown || "", "text/markdown");
 });
 
@@ -526,11 +665,11 @@ $("lookupBtn").addEventListener("click", async () => {
         downloadFile(`clean-${slug(record.project)}-${record.id}.md`, await res.text(), "text/markdown");
       } catch (err) { setStatus(statusEl, err.message, true); }
     });
-    addBtn("Fetch full doc (.md)", async () => {
+    addBtn("Fetch case study (.md)", async () => {
       try {
         const res = await fetch(`/.netlify/functions/list-sessions?id=${encodeURIComponent(id)}&doc=full`);
         if (!res.ok) throw new Error((await res.json()).error || "Not found — generate it first from a live session, or it hasn't been made yet.");
-        downloadFile(`doc-${slug(record.project)}-${record.id}.md`, await res.text(), "text/markdown");
+        downloadFile(`case-study-${slug(record.project)}-${record.id}.md`, await res.text(), "text/markdown");
       } catch (err) { setStatus(statusEl, err.message, true); }
     });
 
