@@ -1,5 +1,9 @@
 # Case Study Agent
 
+> This repo also contains a second, independent tool — the **Expert Interview
+> Agent** — documented in its own section below.
+
+
 Paste raw text and get a **finished, illustrated case study**, rendered into
 **one fixed page template** — the exact structure and design approved in
 Figma — every time. Preview it and download it as a single self-contained
@@ -120,3 +124,104 @@ project's zero-dependency serverless-proxy convention.
   2-4 solution screens) — the slow step. On plans that cap functions at 10s,
   set `OPENAI_IMAGE_QUALITY=low`. The design agent runs Claude at low effort
   to stay comfortably inside the function window.
+
+---
+
+# Expert Interview Agent
+
+Turns a reluctant writer into a willing talker. Instead of asking an expert
+to *write* documentation about a client project, this tool interviews them:
+Claude asks one question at a time (and follow-ups when an answer leaves
+something specific unexplored), the expert answers out loud, Whisper
+transcribes it, and everything is saved. At the end, one click turns the raw
+transcript into an organized Markdown documentation draft.
+
+**Open `public/interview.html`** (e.g. `https://your-site.netlify.app/interview.html`).
+
+## How it works
+
+1. **Setup.** You enter the expert's name, the project name, and a topic
+   outline (one topic per line — e.g. "the client and the problem",
+   "technical approach", "obstacles", "outcome").
+2. **Interview loop**, per question:
+   - `interview-next-question.js` (Claude) looks at the outline + everything
+     asked/answered so far and decides: ask a fresh question on the next
+     topic, or fire a sharp follow-up on something specific the expert just
+     mentioned. This is what pulls out detail an expert wouldn't think to
+     write down themselves.
+   - The question is shown on screen and read aloud (browser
+     `speechSynthesis` — free, no API call).
+   - The expert clicks **Record**, speaks their answer, clicks **Stop**.
+   - `transcribe-answer.js` (OpenAI Whisper) transcribes the recording. The
+     expert can edit the text before submitting if Whisper mis-heard
+     something.
+   - Repeats until Claude decides every topic is sufficiently covered, or the
+     expert clicks **Finish interview now**.
+3. **Save.** `save-session.js` stores the full transcript *and* every raw
+   answer recording to **Netlify Blobs** (`interview-sessions` store) — no
+   external account needed beyond the Netlify site itself. The expert can
+   also **Download transcript (.json)** as a local backup.
+4. **Draft documentation.** Click **Generate documentation draft** —
+   `generate-doc.js` (Claude) turns the transcript into organized Markdown
+   (grouped by topic, grounded strictly in what was said, with an "open
+   questions / gaps" section) — download it as `.md` and hand it to whoever
+   polishes the final doc.
+5. **Review saved sessions later.** `list-sessions.js` lists every saved
+   session (`GET /.netlify/functions/list-sessions`), fetches one session's
+   full transcript by id (`?id=<id>`), or fetches one answer's raw audio
+   (`?id=<id>&audio=<audioKey>`) — useful for building a simple internal
+   review page later, or just to confirm sessions are landing in storage.
+
+## How it's structured
+
+```
+public/interview.html                     → the interview UI (setup, Q&A loop, transcript, save, doc generation)
+netlify/functions/
+  interview-next-question.js              → Claude: outline + history → next question or follow-up
+  transcribe-answer.js                    → OpenAI Whisper: recorded audio → transcript text
+  save-session.js                         → Netlify Blobs: persist transcript + audio for one session
+  list-sessions.js                        → Netlify Blobs: list/fetch saved sessions and audio
+  generate-doc.js                         → Claude: full transcript → structured Markdown documentation draft
+```
+
+## What you need to provide
+
+| What | Required | Notes |
+|---|---|---|
+| **`OPENAI_API_KEY`** | Yes | Used for Whisper transcription. Same env var the case study agent uses — if that's already set on this Netlify site, this works out of the box. |
+| **`ANTHROPIC_API_KEY`** | Yes | Used for the interviewer (next-question) and the doc-writer agent. Same var the case study agent uses. |
+| **Netlify Blobs** | No setup needed | Enabled automatically on Netlify sites (no extra account, bucket, or credentials) — that's why it was chosen as the default storage backend. |
+| `OPENAI_TRANSCRIBE_MODEL` | No | Defaults to `whisper-1`. |
+| `ANTHROPIC_MODEL` | No | Defaults to `claude-opus-5` (shared with the case study agent's setting). |
+
+Nothing else is required to run this end to end once those two keys are set
+on the Netlify site (Site configuration → Environment variables) — the same
+place the case study agent's keys already live.
+
+## Honest limitations / things worth knowing before you rely on this
+
+- **Browser mic access requires HTTPS** (or `localhost`) — this works fine
+  on a deployed Netlify site, but won't work opening the HTML file directly
+  from disk.
+- **Per-answer audio upload is capped** at roughly 2 minutes per answer
+  (Netlify's function request-body limit). Fine for focused Q&A; not meant
+  for uninterrupted 20-minute monologues. If an expert wants to talk longer
+  per topic, coach them to pause and let a follow-up question re-prompt them
+  — that's actually the design intent, not a workaround.
+- **Text-to-speech uses the browser's built-in voice** (no API cost), which
+  sounds robotic on some systems/browsers. The question is always shown as
+  text too, so this is a nice-to-have, not a dependency.
+- **Whisper transcription costs a small per-minute fee** on your OpenAI
+  account; Claude calls (one per question + one per doc generation) cost
+  per-token. For a typical 20-30 minute interview this is cents, not
+  dollars, but it isn't free.
+- **The generated Markdown is a draft, not a finished document.** It's
+  explicitly grounded to only what was said (no invented facts), which means
+  it will sometimes read as incomplete — that's intentional; gaps are called
+  out rather than papered over, and a human should still edit the final
+  version.
+- **No authentication.** Anyone with the `/interview.html` URL can run an
+  interview, and anyone who can call the Netlify functions directly can
+  list/read saved sessions. Fine for an internal, unlisted URL; if this
+  needs to be locked down (e.g. Netlify Identity, a shared password gate),
+  say so and it can be added.

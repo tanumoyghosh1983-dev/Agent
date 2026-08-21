@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Expert Interview Agent</title>
+<style>
+  :root { --bg:#0b0b0c; --panel:#161618; --border:#2a2a2d; --text:#f2f2f2; --muted:#9a9a9f; --accent:#2dd4bf; --danger:#ef4444; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Inter, Segoe UI, Arial, sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
+  label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input[type=text], textarea { width:100%; background:#0f0f11; border:1px solid var(--border); border-radius:8px; color:var(--text); padding:10px 12px; font-size:14px; font-family:inherit; }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { display:flex; gap:12px; }
+  .row > div { flex:1; }
+  button { cursor:pointer; border:none; border-radius:8px; font-size:14px; padding:10px 16px; font-weight:600; }
+  .btn-primary { background: var(--accent); color:#062; }
+  .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-secondary { background:#232326; color:var(--text); border:1px solid var(--border); }
+  .btn-record { background: var(--danger); color:#fff; }
+  .btn-record.recording { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%{opacity:1;} 50%{opacity:.55;} 100%{opacity:1;} }
+  .question { font-size: 18px; line-height:1.5; margin: 4px 0 16px; }
+  .topic-tag { display:inline-block; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--accent); background:#0f2b27; border-radius:5px; padding:3px 8px; margin-bottom:10px; }
+  .qa-item { border-bottom:1px solid var(--border); padding: 14px 0; }
+  .qa-item:last-child { border-bottom:none; }
+  .qa-q { font-weight:600; font-size:14px; margin-bottom:4px; }
+  .qa-a { color:#d0d0d3; font-size:14px; white-space:pre-wrap; }
+  .status { font-size:13px; color: var(--muted); min-height: 18px; margin-top: 8px; }
+  .status.err { color: var(--danger); }
+  .hidden { display:none !important; }
+  a.link-btn { color: var(--accent); text-decoration:none; font-size:13px; }
+  #docOutput { white-space: pre-wrap; font-size: 13.5px; line-height:1.55; background:#0f0f11; border:1px solid var(--border); border-radius:8px; padding:16px; max-height: 480px; overflow:auto; }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Expert Interview Agent</h1>
+  <div class="sub">Answer out loud. Claude asks the next question (and digs into follow-ups); every answer is transcribed and saved for you.</div>
+
+  <div class="panel" id="setupPanel">
+    <div class="row">
+      <div>
+        <label for="expertName">Expert name</label>
+        <input type="text" id="expertName" placeholder="e.g. Priya Shah" />
+      </div>
+      <div>
+        <label for="projectName">Client project name</label>
+        <input type="text" id="projectName" placeholder="e.g. Acme Logistics Platform" />
+      </div>
+    </div>
+    <div style="margin-top:14px;">
+      <label for="outline">Topics to cover (one per line)</label>
+      <textarea id="outline">The client and the original problem
+Technical approach and key decisions
+Obstacles hit and how they were solved
+Outcome and impact for the client</textarea>
+    </div>
+    <div class="toolbar">
+      <button class="btn-primary" id="startBtn">Start interview</button>
+    </div>
+    <div class="status" id="setupStatus"></div>
+  </div>
+
+  <div class="panel hidden" id="interviewPanel">
+    <div class="topic-tag" id="topicTag">Topic</div>
+    <div class="question" id="questionText">Loading question…</div>
+
+    <div class="toolbar">
+      <button class="btn-record" id="recordBtn">● Record answer</button>
+      <button class="btn-secondary hidden" id="reRecordBtn">Re-record</button>
+    </div>
+    <div class="status" id="recStatus"></div>
+
+    <div id="answerReview" class="hidden" style="margin-top:14px;">
+      <label>Transcribed answer (edit if needed)</label>
+      <textarea id="answerText"></textarea>
+      <div class="toolbar">
+        <button class="btn-primary" id="submitAnswerBtn">Submit answer & continue</button>
+      </div>
+    </div>
+
+    <div class="toolbar" style="margin-top:18px;">
+      <button class="btn-secondary" id="finishBtn">Finish interview now</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="transcriptPanel">
+    <h2 style="font-size:16px; margin-top:0;">Transcript so far</h2>
+    <div id="qaList"></div>
+  </div>
+
+  <div class="panel hidden" id="wrapPanel">
+    <h2 style="font-size:16px; margin-top:0;">Interview complete</h2>
+    <div class="status" id="saveStatus"></div>
+    <div class="toolbar">
+      <button class="btn-primary" id="downloadBtn">Download transcript (.json)</button>
+      <button class="btn-secondary" id="genDocBtn">Generate documentation draft</button>
+    </div>
+    <div id="docOutput" class="hidden" style="margin-top:16px;"></div>
+    <div class="toolbar hidden" id="docToolbar">
+      <button class="btn-secondary" id="downloadDocBtn">Download draft (.md)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = {
+  expert: "", project: "", outline: [],
+  history: [], // {topic, question, answerText}
+  qa: [],       // full records incl. audioBase64/mimeType, for saving
+  currentQuestion: null,
+  mediaRecorder: null, chunks: [], recordedBlob: null,
+};
+
+function setStatus(el, msg, isErr) {
+  el.textContent = msg || "";
+  el.classList.toggle("err", !!isErr);
+}
+
+function renderTranscript() {
+  const list = $("qaList");
+  if (!state.history.length) { $("transcriptPanel").classList.add("hidden"); return; }
+  $("transcriptPanel").classList.remove("hidden");
+  list.innerHTML = "";
+  state.history.forEach((h) => {
+    const div = document.createElement("div");
+    div.className = "qa-item";
+    div.innerHTML = `<div class="qa-q">${escapeHtml(h.question)}</div><div class="qa-a">${escapeHtml(h.answerText)}</div>`;
+    list.appendChild(div);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function fetchJSON(url, opts) {
+  const res = await fetch(url, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+async function askNextQuestion() {
+  setStatus($("recStatus"), "");
+  $("questionText").textContent = "Thinking of the next question…";
+  $("recordBtn").disabled = true;
+  try {
+    const data = await fetchJSON("/.netlify/functions/interview-next-question", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outline: state.outline, history: state.history }),
+    });
+    if (data.done) {
+      finishInterview();
+      return;
+    }
+    state.currentQuestion = data;
+    $("topicTag").textContent = data.topic || "Question";
+    $("questionText").textContent = data.question;
+    speakQuestion(data.question);
+  } catch (err) {
+    $("questionText").textContent = "Couldn't load the next question.";
+    setStatus($("recStatus"), err.message, true);
+  } finally {
+    $("recordBtn").disabled = false;
+  }
+}
+
+function speakQuestion(text) {
+  try {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1;
+    window.speechSynthesis.speak(u);
+  } catch (e) { /* optional, ignore failures */ }
+}
+
+$("startBtn").addEventListener("click", () => {
+  state.expert = $("expertName").value.trim();
+  state.project = $("projectName").value.trim();
+  state.outline = $("outline").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  if (!state.expert || !state.project) { setStatus($("setupStatus"), "Please fill in expert name and project name.", true); return; }
+  if (!state.outline.length) { setStatus($("setupStatus"), "Please list at least one topic.", true); return; }
+  $("setupPanel").classList.add("hidden");
+  $("interviewPanel").classList.remove("hidden");
+  askNextQuestion();
+});
+
+let mimeType = "audio/webm";
+$("recordBtn").addEventListener("click", async () => {
+  const btn = $("recordBtn");
+  if (!state.mediaRecorder || state.mediaRecorder.state === "inactive") {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
+      state.chunks = [];
+      const mr = new MediaRecorder(stream, { mimeType });
+      mr.ondataavailable = (e) => { if (e.data.size) state.chunks.push(e.data); };
+      mr.onstop = onRecordingStop;
+      state.mediaRecorder = mr;
+      mr.start();
+      btn.textContent = "■ Stop recording";
+      btn.classList.add("recording");
+      setStatus($("recStatus"), "Recording… speak your answer, then click Stop.");
+    } catch (err) {
+      setStatus($("recStatus"), "Microphone access denied or unavailable: " + err.message, true);
+    }
+  } else {
+    state.mediaRecorder.stop();
+    state.mediaRecorder.stream.getTracks().forEach((t) => t.stop());
+    btn.textContent = "● Record answer";
+    btn.classList.remove("recording");
+  }
+});
+
+async function onRecordingStop() {
+  state.recordedBlob = new Blob(state.chunks, { type: mimeType });
+  setStatus($("recStatus"), "Transcribing…");
+  try {
+    const audioBase64 = await blobToBase64(state.recordedBlob);
+    const data = await fetchJSON("/.netlify/functions/transcribe-answer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioBase64, mimeType }),
+    });
+    $("answerText").value = data.text || "";
+    $("answerReview").classList.remove("hidden");
+    setStatus($("recStatus"), "Transcribed. Review below, then submit.");
+  } catch (err) {
+    setStatus($("recStatus"), "Transcription failed: " + err.message, true);
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+$("submitAnswerBtn").addEventListener("click", async () => {
+  const answerText = $("answerText").value.trim();
+  if (!answerText) { setStatus($("recStatus"), "Please provide an answer before continuing.", true); return; }
+
+  const audioBase64 = state.recordedBlob ? await blobToBase64(state.recordedBlob) : null;
+  const record = {
+    topic: state.currentQuestion.topic,
+    question: state.currentQuestion.question,
+    answerText,
+    audioBase64,
+    mimeType,
+  };
+  state.qa.push(record);
+  state.history.push({ topic: record.topic, question: record.question, answerText });
+  renderTranscript();
+
+  $("answerReview").classList.add("hidden");
+  $("answerText").value = "";
+  state.recordedBlob = null;
+  setStatus($("recStatus"), "");
+  askNextQuestion();
+});
+
+$("finishBtn").addEventListener("click", finishInterview);
+
+async function finishInterview() {
+  $("interviewPanel").classList.add("hidden");
+  $("wrapPanel").classList.remove("hidden");
+  if (!state.qa.length) { setStatus($("saveStatus"), "No answers recorded yet."); return; }
+  setStatus($("saveStatus"), "Saving session…");
+  try {
+    const data = await fetchJSON("/.netlify/functions/save-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa }),
+    });
+    state.sessionId = data.id;
+    setStatus($("saveStatus"), "Saved (session " + data.id + ").");
+  } catch (err) {
+    setStatus($("saveStatus"), "Could not save to server storage: " + err.message + " — use Download to keep a local copy.", true);
+  }
+}
+
+$("downloadBtn").addEventListener("click", () => {
+  const payload = { expert: state.expert, project: state.project, createdAt: new Date().toISOString(), qa: state.qa.map(({ audioBase64, ...rest }) => rest) };
+  downloadFile(`interview-${slug(state.project)}-${Date.now()}.json`, JSON.stringify(payload, null, 2), "application/json");
+});
+
+$("genDocBtn").addEventListener("click", async () => {
+  const out = $("docOutput");
+  out.classList.remove("hidden");
+  out.textContent = "Generating documentation draft…";
+  try {
+    const data = await fetchJSON("/.netlify/functions/generate-doc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expert: state.expert, project: state.project, qa: state.qa }),
+    });
+    out.textContent = data.markdown;
+    state.docMarkdown = data.markdown;
+    $("docToolbar").classList.remove("hidden");
+  } catch (err) {
+    out.textContent = "Failed to generate documentation: " + err.message;
+  }
+});
+
+$("downloadDocBtn").addEventListener("click", () => {
+  downloadFile(`doc-${slug(state.project)}-${Date.now()}.md`, state.docMarkdown || "", "text/markdown");
+});
+
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function slug(s) { return String(s || "session").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60) || "session"; }
+</script>
+</body>
+</html>
