@@ -1,0 +1,7 @@
+# raw/ and screenshots/ hold pipeline intermediates (large, regenerated
+# each run) - not committed. report/ IS committed deliberately: that's what
+# Netlify serves when this repo is connected as a static site (see README).
+node_modules
+raw/*.json
+screenshots/*
+.env
