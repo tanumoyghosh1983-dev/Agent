@@ -84,6 +84,37 @@ the CSV's month-by-month history, which varies a lot per page) also drive
 conversion rate and aren't visible on the page itself. Treat surfaced
 patterns as hypotheses to test, not proven causes.
 
+## Running via GitHub Actions instead of locally
+
+`.github/workflows/ppc-analyzer.yml` runs the full pipeline (rank → capture →
+critique → report) on GitHub's own runners and commits the updated
+`report/` back to this branch, so you don't have to run it on your own
+machine each time.
+
+**Trigger:** manual only ("Run workflow" in the Actions tab) — it never
+runs on a schedule or on push, since every run calls the paid Claude API.
+
+**One-time setup:**
+1. In the repo settings, add a secret: **Settings → Secrets and variables →
+   Actions → New repository secret** → name `ANTHROPIC_API_KEY`, value your
+   Anthropic API key.
+2. That's it — `npm ci` and `playwright install` are handled by the workflow.
+
+**To run:** go to the **Actions** tab → **PPC Landing Page Analyzer** →
+**Run workflow**. Inputs:
+- `csv_path` — defaults to `ppc-analyzer/data/PPC_Dashboard_Report.csv`
+  (update this after re-exporting a fresh CSV and committing it)
+- `top_n` — top/bottom N pages per ranking category (default 5)
+- `min_sessions` — minimum sessions for reliable ranking (default 100)
+- `scope` — `test-batch` (top+bottom N, default) or `all` (every page —
+  more API cost, more runtime)
+
+The run uploads `raw/` and `screenshots/` as a downloadable build artifact
+(30-day retention) for manual review, and commits the regenerated
+`report/index.html` (+ `report/screenshots/`) straight to this branch —
+which also updates the live Netlify site if one is connected, since
+Netlify redeploys on push.
+
 ## Deploying the report to Netlify
 
 Netlify should host only the **finished static report** — not run this

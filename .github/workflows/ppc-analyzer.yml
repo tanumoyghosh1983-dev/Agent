@@ -1,0 +1,95 @@
+name: PPC Landing Page Analyzer
+
+# Manual trigger only — each run calls the paid Claude API, so we never run
+# this on a schedule or on push. Trigger from the Actions tab ("Run workflow").
+on:
+  workflow_dispatch:
+    inputs:
+      csv_path:
+        description: "Path to the CSV export (relative to repo root)"
+        required: false
+        default: "ppc-analyzer/data/PPC_Dashboard_Report.csv"
+      top_n:
+        description: "Top/bottom N pages per ranking category"
+        required: false
+        default: "5"
+      min_sessions:
+        description: "Minimum sessions for reliable conversion-rate ranking"
+        required: false
+        default: "100"
+      scope:
+        description: "Which pages to run the full pipeline against"
+        required: false
+        default: "test-batch"
+        type: choice
+        options:
+          - test-batch
+          - all
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ppc-analyzer
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ppc-analyzer/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run pipeline (rank + capture)
+        run: |
+          node scripts/rank.js "${{ github.event.inputs.csv_path }}" \
+            --top "${{ github.event.inputs.top_n }}" \
+            --min-sessions "${{ github.event.inputs.min_sessions }}"
+
+          if [ "${{ github.event.inputs.scope }}" = "all" ]; then
+            BATCH_INPUT="raw/pages.json"
+          else
+            BATCH_INPUT="raw/test-batch.json"
+          fi
+          node scripts/capture.js "$BATCH_INPUT" --concurrency 2 --delay 1500
+
+      - name: Run critique (calls the Claude API — costs money)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/critique.js raw/capture-results.json --delay 1000
+
+      - name: Build report
+        run: node scripts/report.js
+
+      - name: Upload raw data + screenshots (for manual review)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppc-analyzer-raw-output
+          path: |
+            ppc-analyzer/raw/
+            ppc-analyzer/screenshots/
+          retention-days: 30
+
+      - name: Commit updated report back to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add report/
+          if git diff --cached --quiet; then
+            echo "No report changes to commit."
+          else
+            git commit -m "Update PPC landing page report ($(date -u +%Y-%m-%d))"
+            git push
+          fi
