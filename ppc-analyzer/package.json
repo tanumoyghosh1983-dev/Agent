@@ -1,0 +1,17 @@
+{
+  "name": "ppc-landing-page-analyzer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Analyzes PPC landing page performance by correlating CSV conversion data with live-page AI critique (Playwright + Claude vision).",
+  "type": "module",
+  "scripts": {
+    "rank": "node scripts/rank.js",
+    "capture": "node scripts/capture.js",
+    "critique": "node scripts/critique.js",
+    "report": "node scripts/report.js",
+    "analyze": "node scripts/analyze.js"
+  },
+  "dependencies": {
+    "csv-parse": "^5.6.0"
+  }
+}

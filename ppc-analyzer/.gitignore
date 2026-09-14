@@ -1,0 +1,5 @@
+node_modules
+raw/*.json
+screenshots/*
+report/*.html
+.env
