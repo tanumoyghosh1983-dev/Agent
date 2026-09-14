@@ -1,0 +1,6 @@
+# For a separate Netlify site connected to this repo with
+# Base directory = ppc-analyzer. Publishes the static HTML report only —
+# Netlify never runs the capture/critique pipeline (see README.md).
+[build]
+  publish = "report"
+  command = "true"
