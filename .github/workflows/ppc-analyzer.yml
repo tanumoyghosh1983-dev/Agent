@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       csv_path:
-        description: "Path to the CSV export (relative to repo root)"
+        description: "Path to the CSV export (relative to the ppc-analyzer/ folder)"
         required: false
-        default: "ppc-analyzer/data/PPC_Dashboard_Report.csv"
+        default: "data/PPC_Dashboard_Report.csv"
       top_n:
         description: "Top/bottom N pages per ranking category"
         required: false
