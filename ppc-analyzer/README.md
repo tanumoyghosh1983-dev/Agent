@@ -128,6 +128,33 @@ Fresh CSV export later — just re-run the same command with the new file.
 - `site/report/index.html` — final ranked report with embedded screenshots,
   scores, and cross-page pattern observations
 
+## Exporting a report as PDF (for uploading to ChatGPT/Claude)
+
+The report's full-resolution screenshots make a browser "Print to PDF"
+impractical at any real page count (can easily be several hundred MB).
+`scripts/export-pdf.js` instead recompresses every screenshot (downscaled,
+JPEG) before rendering, producing a much smaller PDF with the exact same
+report layout - tables, scores, and images.
+
+```bash
+node scripts/export-pdf.js site/report/runs/<runId>/ --out report.pdf
+```
+
+Works against any report folder containing `index.html` + `screenshots/`
+- a run directory in this repo, or an unzipped `ppc-analyzer-full-report-zip`
+download from a GitHub Actions run. Defaults (`--max-width 800 --quality 70`)
+land around 50MB for a ~100-page report; if that's still too big for your
+target upload limit, push both down:
+
+```bash
+node scripts/export-pdf.js site/report/runs/<runId>/ --out report.pdf --max-width 350 --quality 40
+```
+
+That combination produced a 19.5MB PDF from a 104-page/202-screenshot
+report in testing - small enough for typical ChatGPT/Claude upload limits.
+Lower `--max-width` and `--quality` further if you need it smaller still
+(images get blurrier as you push them down).
+
 ## Important caveat
 
 **Correlation is not causation.** The report flags this explicitly: traffic

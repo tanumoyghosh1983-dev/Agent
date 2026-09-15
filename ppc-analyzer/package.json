@@ -9,11 +9,13 @@
     "capture": "node scripts/capture.js",
     "critique": "node scripts/critique.js",
     "report": "node scripts/report.js",
-    "analyze": "node scripts/analyze.js"
+    "analyze": "node scripts/analyze.js",
+    "pdf": "node scripts/export-pdf.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",
     "csv-parse": "^5.6.0",
-    "playwright": "^1.63.0"
+    "playwright": "^1.63.0",
+    "sharp": "^0.35.4"
   }
 }
