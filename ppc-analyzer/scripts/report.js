@@ -107,7 +107,33 @@ function run() {
     comparisonLine("CTA clarity (AI score ≥4/5)", highCtaClarity, "clear CTA", lowCtaClarity, "unclear CTA"),
   ];
 
-  // --- Copy screenshots into report/ so the HTML is self-contained-ish ---
+  // Every run gets its own permanent, timestamped copy under
+  // site/report/runs/<runId>/ so a new analysis never erases an older one.
+  // site/report/index.html is always a copy of the newest run (stable
+  // bookmarkable URL); site/report/history.html lists every run.
+  const runId = new Date().toISOString().replace(/[:.]/g, "-");
+  const runDir = path.join("site", "report", "runs", runId);
+  mkdirSync(path.join(runDir, "screenshots"), { recursive: true });
+
+  for (const r of merged) {
+    for (const key of ["desktopScreenshot", "mobileScreenshot"]) {
+      if (r[key] && existsSync(path.join("screenshots", r[key]))) {
+        copyFileSync(path.join("screenshots", r[key]), path.join(runDir, "screenshots", r[key]));
+      }
+    }
+  }
+
+  const html = buildHtml(merged, patterns, { runId, historyHref: "../../history.html" });
+  writeFileSync(path.join(runDir, "index.html"), html);
+
+  // Update the manifest of all runs (newest first).
+  const manifestPath = path.join("site", "report", "manifest.json");
+  const manifest = loadJson(manifestPath, []);
+  manifest.unshift({ runId, generatedAt: new Date().toISOString(), pageCount: merged.length });
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+  // site/report/index.html always mirrors the latest run, so the same
+  // bookmarked URL keeps working; screenshots live alongside it too.
   mkdirSync("site/report/screenshots", { recursive: true });
   for (const r of merged) {
     for (const key of ["desktopScreenshot", "mobileScreenshot"]) {
@@ -116,10 +142,13 @@ function run() {
       }
     }
   }
+  const latestHtml = buildHtml(merged, patterns, { runId, historyHref: "history.html" });
+  writeFileSync("site/report/index.html", latestHtml);
 
-  const html = buildHtml(merged, patterns);
-  writeFileSync("site/report/index.html", html);
-  console.log(`Report written to site/report/index.html (${merged.length} pages)`);
+  writeFileSync("site/report/history.html", buildHistoryHtml(manifest));
+
+  console.log(`Report written to site/report/index.html and site/report/runs/${runId}/ (${merged.length} pages)`);
+  console.log(`History page: site/report/history.html (${manifest.length} runs total)`);
 }
 
 function scoreBar(score) {
@@ -164,7 +193,7 @@ function pageCard(r, rank) {
 </div>`;
 }
 
-function buildHtml(merged, patterns) {
+function buildHtml(merged, patterns, { runId, historyHref } = {}) {
   const cards = merged.map((r, i) => pageCard(r, i + 1)).join("\n");
   const patternsList = patterns.map((p) => `<li>${escapeHtml(p)}</li>`).join("\n");
 
@@ -205,7 +234,10 @@ function buildHtml(merged, patterns) {
 <body>
 <div class="wrap">
   <h1>PPC Landing Page Performance Report</h1>
-  <p>Generated ${new Date().toISOString()} · ${merged.length} pages · Ranked by Conversion Rate</p>
+  <p>Generated ${new Date().toISOString()} · ${merged.length} pages · Ranked by Conversion Rate
+    ${runId ? ` · Run <code>${escapeHtml(runId)}</code>` : ""}
+    ${historyHref ? ` · <a href="${escapeHtml(historyHref)}">View all past runs →</a>` : ""}
+  </p>
 
   <div class="disclaimer">
     <strong>⚠ Correlation is not causation.</strong> This report compares on-page design/copy signals against
@@ -224,6 +256,43 @@ function buildHtml(merged, patterns) {
 
   <h2>Pages (ranked by conversion rate)</h2>
   ${cards}
+</div>
+</body>
+</html>`;
+}
+
+function buildHistoryHtml(manifest) {
+  const rows = manifest
+    .map((m, i) => {
+      const label = i === 0 ? " (latest)" : "";
+      const link = i === 0 ? "index.html" : `runs/${escapeHtml(m.runId)}/index.html`;
+      return `<tr><td>${escapeHtml(m.generatedAt)}${label}</td><td>${m.pageCount} pages</td><td><a href="${link}">Open report →</a></td></tr>`;
+    })
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PPC Analyzer — All Runs</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 0 16px 60px; background: #f7f7f8; color: #1a1a1a; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { margin-top: 32px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 14px; }
+  th { background: #fafafa; }
+  a { color: #2b6cb0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>All Analysis Runs</h1>
+  <p><a href="index.html">← Back to latest report</a></p>
+  <table>
+    <tr><th>Generated</th><th>Pages</th><th></th></tr>
+    ${rows || '<tr><td colspan="3">No runs yet.</td></tr>'}
+  </table>
 </div>
 </body>
 </html>`;

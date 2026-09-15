@@ -57,6 +57,8 @@
     background: #2b6cb0; color: #fff; text-decoration: none; font-weight: 600;
     padding: 8px 16px; border-radius: 6px; font-size: 14px; white-space: nowrap;
   }
+  .report-banner a.secondary { background: transparent; color: #2b6cb0; padding: 8px 4px; }
+  .report-banner .links { display: flex; gap: 8px; align-items: center; }
 </style>
 </head>
 <body>
@@ -65,8 +67,11 @@
   <p class="sub">Upload a fresh PPC dashboard CSV export and analyze every page's conversion performance against an AI critique of the live page.</p>
 
   <div class="report-banner">
-    <span>📊 Reports always live at the same place, whenever you want them.</span>
-    <a href="report/">Open report</a>
+    <span>📊 Every run is saved — nothing gets overwritten.</span>
+    <div class="links">
+      <a class="secondary" href="report/history.html">All past runs</a>
+      <a href="report/">Latest report</a>
+    </div>
   </div>
 
   <div class="card">
