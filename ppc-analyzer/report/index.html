@@ -4,18 +4,59 @@
 <meta charset="utf-8">
 <title>PPC Landing Page Performance Report</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 640px; margin: 80px auto; padding: 0 20px; color: #1a1a1a; }
-  code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 0 16px 60px; background: #f7f7f8; color: #1a1a1a; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { margin-top: 32px; }
+  .disclaimer { background: #fff8e1; border: 1px solid #f0d878; border-radius: 8px; padding: 16px; margin: 20px 0; font-size: 14px; }
+  .patterns { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px 24px; margin: 20px 0; }
+  .patterns li { margin: 8px 0; }
+  .page-card { background: #fff; border: 1px solid #ddd; border-radius: 10px; margin: 24px 0; overflow: hidden; }
+  .page-header { padding: 16px 20px; border-bottom: 1px solid #eee; background: #fafafa; }
+  .page-header h3 { margin: 0 0 8px; }
+  .metrics { display: flex; gap: 16px; margin-bottom: 6px; flex-wrap: wrap; }
+  .metric { font-size: 14px; color: #444; }
+  .page-body { display: flex; flex-wrap: wrap; gap: 20px; padding: 20px; }
+  .screenshots { display: flex; gap: 10px; flex-wrap: wrap; }
+  .shot { border: 1px solid #ccc; border-radius: 4px; max-height: 320px; object-fit: cover; object-position: top; }
+  .shot.desktop { width: 260px; }
+  .shot.mobile { width: 110px; }
+  .critique { flex: 1; min-width: 320px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table td { padding: 4px 6px; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
+  table td:first-child { white-space: nowrap; font-weight: 600; width: 130px; }
+  .notes { color: #555; }
+  .score-bar { display: inline-block; width: 60px; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; vertical-align: middle; margin-right: 4px; }
+  .score-fill { display: block; height: 100%; background: #4c8bf5; }
+  .flag { color: #b02a2a; }
+  .recommendation { background: #eef6ff; padding: 8px 10px; border-radius: 6px; }
+  a { color: #2b6cb0; }
 </style>
 </head>
 <body>
-  <h1>No report generated yet</h1>
-  <p>This is a placeholder. Run the pipeline locally to generate the real report, then commit and push <code>report/</code> to update this page:</p>
-  <pre><code>cd ppc-analyzer
-npm install
-npx playwright install chromium
-export ANTHROPIC_API_KEY=sk-ant-...
-node scripts/analyze.js data/PPC_Dashboard_Report.csv</code></pre>
-  <p>See <code>ppc-analyzer/README.md</code> for details.</p>
+<div class="wrap">
+  <h1>PPC Landing Page Performance Report</h1>
+  <p>Generated 2026-09-15T08:03:36.614Z · 0 pages · Ranked by Conversion Rate</p>
+
+  <div class="disclaimer">
+    <strong>⚠ Correlation is not causation.</strong> This report compares on-page design/copy signals against
+    conversion rate, but conversion rate is also driven by factors invisible on the page itself: traffic source
+    quality, keyword intent, ad targeting, and seasonality (which varies significantly per page in the historical
+    monthly data). A page that "looks worse" but converts well may simply get higher-intent traffic, and vice versa.
+    Use these patterns as hypotheses to test, not proven causes.
+  </div>
+
+  <div class="patterns">
+    <h2>Observed Patterns</h2>
+    <ul>
+      <li>CTA/form above the fold (desktop): not enough data in one group to compare.</li>
+<li>Copy length: not enough data in one group to compare.</li>
+<li>Trust signals (AI score ≥4/5): not enough data in one group to compare.</li>
+<li>CTA clarity (AI score ≥4/5): not enough data in one group to compare.</li>
+    </ul>
+  </div>
+
+  <h2>Pages (ranked by conversion rate)</h2>
+  
+</div>
 </body>
 </html>
