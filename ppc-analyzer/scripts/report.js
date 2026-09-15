@@ -56,6 +56,11 @@ const EXPORT_COLUMNS = [
   ["loadTimeMs", (r) => r.loadTimeMs],
   ["overallImpression", (r) => r.critique.overallImpression],
   ["topRecommendation", (r) => r.critique.topRecommendation],
+  // CSV can't embed images - these filenames let you find the matching
+  // screenshot in this run's screenshots/ folder (next to this CSV) or in
+  // the HTML report, where they're shown inline.
+  ["desktopScreenshotFile", (r) => r.desktopScreenshot],
+  ["mobileScreenshotFile", (r) => r.mobileScreenshot],
 ];
 
 function buildCsv(merged) {
