@@ -181,12 +181,16 @@ function run() {
   const csv = buildCsv(merged);
   writeFileSync(path.join(runDir, "export.csv"), csv);
 
-  // Zip runDir now (screenshots + CSV) so there's a downloadable, fully
-  // self-contained bundle. The zip lives *next to* runDir, so it's fine
-  // that index.html (written after) isn't inside this snapshot - the
-  // report page you're on already has everything the zip would show you.
+  // ZIP bundles duplicate the screenshots a second time (once loose, once
+  // compressed). That's fine for a small test batch but adds up fast at
+  // scale - a 100+ page run can already be several hundred MB of loose
+  // screenshots, so skip the extra copy past this size.
+  const ZIP_MAX_PAGES = 20;
   const zipPath = path.join("site", "report", "runs", `${runId}.zip`);
-  const zipOk = buildZip(runDir, zipPath);
+  const zipOk = merged.length <= ZIP_MAX_PAGES ? buildZip(runDir, zipPath) : false;
+  if (merged.length > ZIP_MAX_PAGES) {
+    console.log(`Skipping ZIP bundle: ${merged.length} pages exceeds ${ZIP_MAX_PAGES} (avoids duplicating screenshots again). Browse/download screenshots individually from the report instead.`);
+  }
 
   const html = buildHtml(merged, patterns, {
     runId,
@@ -202,21 +206,17 @@ function run() {
   manifest.unshift({ runId, generatedAt: new Date().toISOString(), pageCount: merged.length });
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-  // site/report/index.html always mirrors the latest run, so the same
-  // bookmarked URL keeps working; screenshots live alongside it too.
-  mkdirSync("site/report/screenshots", { recursive: true });
-  for (const r of merged) {
-    for (const key of ["desktopScreenshot", "mobileScreenshot"]) {
-      if (r[key] && existsSync(path.join("screenshots", r[key]))) {
-        copyFileSync(path.join("screenshots", r[key]), path.join("site", "report", "screenshots", r[key]));
-      }
-    }
-  }
+  // site/report/index.html is the stable bookmarkable URL for "the latest
+  // report" - but it's just HTML pointing at this run's own screenshots/
+  // (runs/<runId>/screenshots/...), not a second copy of the images. Only
+  // the run archive itself stores screenshots, so each page's images exist
+  // exactly once in the repo no matter how many times you re-run this.
   const latestHtml = buildHtml(merged, patterns, {
     runId,
     historyHref: "history.html",
     csvHref: "export.csv",
     zipHref: zipOk ? `runs/${runId}.zip` : null,
+    screenshotsBase: `runs/${runId}/screenshots/`,
   });
   writeFileSync("site/report/index.html", latestHtml);
   writeFileSync("site/report/export.csv", csv);
@@ -225,7 +225,7 @@ function run() {
 
   console.log(`Report written to site/report/index.html and site/report/runs/${runId}/ (${merged.length} pages)`);
   console.log(`CSV export: site/report/export.csv`);
-  console.log(zipOk ? `ZIP bundle (report + screenshots): site/report/runs/${runId}.zip` : `ZIP bundle skipped (zip command unavailable)`);
+  console.log(zipOk ? `ZIP bundle (report + screenshots): site/report/runs/${runId}.zip` : `ZIP bundle skipped`);
   console.log(`History page: site/report/history.html (${manifest.length} runs total)`);
 }
 
@@ -234,7 +234,7 @@ function scoreBar(score) {
   return `<span class="score-bar" title="${s}/5"><span class="score-fill" style="width:${(s / 5) * 100}%"></span></span> ${s}/5`;
 }
 
-function pageCard(r, rank) {
+function pageCard(r, rank, screenshotsBase) {
   const c = r.critique;
   return `
 <div class="page-card">
@@ -249,8 +249,8 @@ function pageCard(r, rank) {
   </div>
   <div class="page-body">
     <div class="screenshots">
-      ${r.desktopScreenshot ? `<a href="screenshots/${escapeHtml(r.desktopScreenshot)}" target="_blank"><img src="screenshots/${escapeHtml(r.desktopScreenshot)}" alt="Desktop screenshot" class="shot desktop"></a>` : ""}
-      ${r.mobileScreenshot ? `<a href="screenshots/${escapeHtml(r.mobileScreenshot)}" target="_blank"><img src="screenshots/${escapeHtml(r.mobileScreenshot)}" alt="Mobile screenshot" class="shot mobile"></a>` : ""}
+      ${r.desktopScreenshot ? `<a href="${screenshotsBase}${escapeHtml(r.desktopScreenshot)}" target="_blank"><img src="${screenshotsBase}${escapeHtml(r.desktopScreenshot)}" alt="Desktop screenshot" class="shot desktop"></a>` : ""}
+      ${r.mobileScreenshot ? `<a href="${screenshotsBase}${escapeHtml(r.mobileScreenshot)}" target="_blank"><img src="${screenshotsBase}${escapeHtml(r.mobileScreenshot)}" alt="Mobile screenshot" class="shot mobile"></a>` : ""}
     </div>
     <div class="critique">
       <table>
@@ -271,8 +271,8 @@ function pageCard(r, rank) {
 </div>`;
 }
 
-function buildHtml(merged, patterns, { runId, historyHref, csvHref, zipHref } = {}) {
-  const cards = merged.map((r, i) => pageCard(r, i + 1)).join("\n");
+function buildHtml(merged, patterns, { runId, historyHref, csvHref, zipHref, screenshotsBase = "screenshots/" } = {}) {
+  const cards = merged.map((r, i) => pageCard(r, i + 1, screenshotsBase)).join("\n");
   const patternsList = patterns.map((p) => `<li>${escapeHtml(p)}</li>`).join("\n");
 
   return `<!doctype html>
