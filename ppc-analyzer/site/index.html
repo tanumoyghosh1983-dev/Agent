@@ -47,12 +47,27 @@
   .error { color: #b02a2a; background: #fff0f0; border: 1px solid #f0b8b8; border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 14px; }
   a.report-link { display: inline-block; margin-top: 14px; font-weight: 600; }
   .costnote { font-size: 13px; color: #8a6d00; background: #fff8e1; border: 1px solid #f0d878; border-radius: 6px; padding: 10px 12px; margin-top: 10px; }
+  .report-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: #eaf3ff; border: 1px solid #b9d6f7; border-radius: 10px;
+    padding: 14px 18px; margin: 24px 0 0;
+  }
+  .report-banner span { font-size: 14px; color: #1a1a1a; }
+  .report-banner a {
+    background: #2b6cb0; color: #fff; text-decoration: none; font-weight: 600;
+    padding: 8px 16px; border-radius: 6px; font-size: 14px; white-space: nowrap;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>PPC Landing Page Analyzer</h1>
   <p class="sub">Upload a fresh PPC dashboard CSV export and analyze every page's conversion performance against an AI critique of the live page.</p>
+
+  <div class="report-banner">
+    <span>📊 Reports always live at the same place, whenever you want them.</span>
+    <a href="report/">Open report</a>
+  </div>
 
   <div class="card">
     <form id="analyzeForm">
@@ -103,8 +118,6 @@
       <a class="report-link" id="actionsLink" href="#" target="_blank" hidden>View full run on GitHub →</a>
     </div>
   </div>
-
-  <p class="hint">Already have a report? <a href="report/">View the latest report</a>.</p>
 </div>
 
 <script>
@@ -227,8 +240,9 @@
         submitBtn.disabled = false;
         submitBtn.textContent = 'Analyze';
         if (data.conclusion === 'success') {
-          statusExtra.textContent = 'Done! Report updated.';
+          statusExtra.textContent = 'Done! Opening the report...';
           reportLink.hidden = false;
+          setTimeout(() => { window.location.href = 'report/'; }, 1500);
         } else {
           statusExtra.textContent = 'The run finished with a failure — check the GitHub run for details.';
           setDot('dot-report', 'failed');
