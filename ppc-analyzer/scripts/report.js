@@ -29,6 +29,41 @@ function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function csvCell(value) {
+  const s = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+const EXPORT_COLUMNS = [
+  ["pageName", (r) => r.pageName],
+  ["url", (r) => r.url],
+  ["conversionRate", (r) => r.conversionRate],
+  ["totalSessions", (r) => r.totalSessions],
+  ["totalConversions", (r) => r.totalConversions],
+  ["writer", (r) => r.writer],
+  ["designer", (r) => r.designer],
+  ["ctaVisibilityScore", (r) => r.critique.ctaVisibility?.score],
+  ["ctaClarityScore", (r) => r.critique.ctaClarity?.score],
+  ["messageMatchScore", (r) => r.critique.messageMatchPotential?.score],
+  ["visualHierarchyScore", (r) => r.critique.visualHierarchy?.score],
+  ["trustSignalsScore", (r) => r.critique.trustSignals?.score],
+  ["mobileUsabilityScore", (r) => r.critique.mobileUsability?.score],
+  ["copyScannabilityScore", (r) => r.critique.copyScannability?.score],
+  ["brokenOrDated", (r) => (r.critique.brokenOrDated?.found ? "yes" : "no")],
+  ["ctaOrFoldAboveDesktop", (r) => r.ctaOrFoldDesktop],
+  ["ctaOrFoldAboveMobile", (r) => r.ctaOrFoldMobile],
+  ["wordCount", (r) => r.wordCount],
+  ["loadTimeMs", (r) => r.loadTimeMs],
+  ["overallImpression", (r) => r.critique.overallImpression],
+  ["topRecommendation", (r) => r.critique.topRecommendation],
+];
+
+function buildCsv(merged) {
+  const header = EXPORT_COLUMNS.map(([name]) => csvCell(name)).join(",");
+  const rows = merged.map((r) => EXPORT_COLUMNS.map(([, get]) => csvCell(get(r))).join(","));
+  return [header, ...rows].join("\n") + "\n";
+}
+
 function run() {
   const pagesData = loadJson("raw/pages.json");
   const critiques = loadJson("raw/critiques.json", []);
@@ -123,8 +158,10 @@ function run() {
     }
   }
 
-  const html = buildHtml(merged, patterns, { runId, historyHref: "../../history.html" });
+  const csv = buildCsv(merged);
+  const html = buildHtml(merged, patterns, { runId, historyHref: "../../history.html", csvHref: "export.csv" });
   writeFileSync(path.join(runDir, "index.html"), html);
+  writeFileSync(path.join(runDir, "export.csv"), csv);
 
   // Update the manifest of all runs (newest first).
   const manifestPath = path.join("site", "report", "manifest.json");
@@ -142,12 +179,14 @@ function run() {
       }
     }
   }
-  const latestHtml = buildHtml(merged, patterns, { runId, historyHref: "history.html" });
+  const latestHtml = buildHtml(merged, patterns, { runId, historyHref: "history.html", csvHref: "export.csv" });
   writeFileSync("site/report/index.html", latestHtml);
+  writeFileSync("site/report/export.csv", csv);
 
   writeFileSync("site/report/history.html", buildHistoryHtml(manifest));
 
   console.log(`Report written to site/report/index.html and site/report/runs/${runId}/ (${merged.length} pages)`);
+  console.log(`CSV export: site/report/export.csv`);
   console.log(`History page: site/report/history.html (${manifest.length} runs total)`);
 }
 
@@ -193,7 +232,7 @@ function pageCard(r, rank) {
 </div>`;
 }
 
-function buildHtml(merged, patterns, { runId, historyHref } = {}) {
+function buildHtml(merged, patterns, { runId, historyHref, csvHref } = {}) {
   const cards = merged.map((r, i) => pageCard(r, i + 1)).join("\n");
   const patternsList = patterns.map((p) => `<li>${escapeHtml(p)}</li>`).join("\n");
 
@@ -236,6 +275,7 @@ function buildHtml(merged, patterns, { runId, historyHref } = {}) {
   <h1>PPC Landing Page Performance Report</h1>
   <p>Generated ${new Date().toISOString()} · ${merged.length} pages · Ranked by Conversion Rate
     ${runId ? ` · Run <code>${escapeHtml(runId)}</code>` : ""}
+    ${csvHref ? ` · <a href="${escapeHtml(csvHref)}" download>⬇ Download CSV</a>` : ""}
     ${historyHref ? ` · <a href="${escapeHtml(historyHref)}">View all past runs →</a>` : ""}
   </p>
 
@@ -265,8 +305,8 @@ function buildHistoryHtml(manifest) {
   const rows = manifest
     .map((m, i) => {
       const label = i === 0 ? " (latest)" : "";
-      const link = i === 0 ? "index.html" : `runs/${escapeHtml(m.runId)}/index.html`;
-      return `<tr><td>${escapeHtml(m.generatedAt)}${label}</td><td>${m.pageCount} pages</td><td><a href="${link}">Open report →</a></td></tr>`;
+      const dir = i === 0 ? "" : `runs/${escapeHtml(m.runId)}/`;
+      return `<tr><td>${escapeHtml(m.generatedAt)}${label}</td><td>${m.pageCount} pages</td><td><a href="${dir}index.html">Open report →</a></td><td><a href="${dir}export.csv" download>⬇ CSV</a></td></tr>`;
     })
     .join("\n");
 
@@ -290,8 +330,8 @@ function buildHistoryHtml(manifest) {
   <h1>All Analysis Runs</h1>
   <p><a href="index.html">← Back to latest report</a></p>
   <table>
-    <tr><th>Generated</th><th>Pages</th><th></th></tr>
-    ${rows || '<tr><td colspan="3">No runs yet.</td></tr>'}
+    <tr><th>Generated</th><th>Pages</th><th></th><th></th></tr>
+    ${rows || '<tr><td colspan="4">No runs yet.</td></tr>'}
   </table>
 </div>
 </body>
