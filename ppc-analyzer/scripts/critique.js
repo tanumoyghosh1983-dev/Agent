@@ -105,7 +105,7 @@ async function critiquePage(pageResult) {
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 1500,
+      max_tokens: 4096,
       messages: [{ role: "user", content }],
     });
   } catch (err) {
@@ -120,10 +120,11 @@ async function critiquePage(pageResult) {
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     critique = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
   } catch (err) {
+    const truncatedHint = response.stop_reason === "max_tokens" ? " (response was cut off at max_tokens)" : "";
     return {
       pageName: pageResult.pageName,
       url: pageResult.url,
-      error: `Failed to parse JSON critique: ${err.message}`,
+      error: `Failed to parse JSON critique: ${err.message}${truncatedHint}`,
       rawResponse: rawText,
     };
   }

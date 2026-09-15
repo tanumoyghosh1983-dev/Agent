@@ -120,8 +120,21 @@ async function capturePage(browser, pageRecord, outDir) {
 
       await page.waitForTimeout(500); // let above-fold layout settle
 
+      // Claude's vision API rejects images with a dimension over 8000px.
+      // Very long landing pages can exceed that with a full-page screenshot,
+      // so clip to the max instead of failing the critique step later.
+      const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+      const MAX_SCREENSHOT_HEIGHT = 8000;
+
       const screenshotPath = path.join(outDir, `${slug}-${viewportName}.png`);
-      await page.screenshot({ path: screenshotPath, fullPage: true });
+      if (pageHeight > MAX_SCREENSHOT_HEIGHT) {
+        await page.screenshot({
+          path: screenshotPath,
+          clip: { x: 0, y: 0, width: viewportSize.width, height: MAX_SCREENSHOT_HEIGHT },
+        });
+      } else {
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+      }
 
       const extracted = await extractPageData(page);
 
