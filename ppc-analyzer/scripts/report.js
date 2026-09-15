@@ -169,6 +169,8 @@ function run() {
   const runId = new Date().toISOString().replace(/[:.]/g, "-");
   const runDir = path.join("site", "report", "runs", runId);
   mkdirSync(path.join(runDir, "screenshots"), { recursive: true });
+  mkdirSync("raw", { recursive: true });
+  writeFileSync(path.join("raw", "run-id.txt"), runId); // lets other steps (e.g. PDF export) find this run without parsing logs
 
   for (const r of merged) {
     for (const key of ["desktopScreenshot", "mobileScreenshot"]) {

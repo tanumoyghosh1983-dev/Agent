@@ -81,10 +81,16 @@ jobs:
       - name: Build report
         run: node scripts/report.js
 
-      - name: Upload full report bundle (HTML + CSV + all screenshots, .zip)
+      - name: Export compressed PDF chunks (for uploading to ChatGPT/Claude)
+        run: |
+          RUN_ID=$(cat raw/run-id.txt)
+          node scripts/export-pdf.js "site/report/runs/$RUN_ID" \
+            --chunks 5 --out-prefix dist-exports/report --max-width 400 --quality 45
+
+      - name: Upload full report exports (.zip + compressed PDF chunks)
         uses: actions/upload-artifact@v4
         with:
-          name: ppc-analyzer-full-report-zip
+          name: ppc-analyzer-report-exports
           path: ppc-analyzer/dist-exports/
           retention-days: 30
           if-no-files-found: ignore

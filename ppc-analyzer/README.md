@@ -133,8 +133,21 @@ Fresh CSV export later — just re-run the same command with the new file.
 The report's full-resolution screenshots make a browser "Print to PDF"
 impractical at any real page count (can easily be several hundred MB).
 `scripts/export-pdf.js` instead recompresses every screenshot (downscaled,
-JPEG) before rendering, producing a much smaller PDF with the exact same
+JPEG) before rendering, producing much smaller PDF(s) with the exact same
 report layout - tables, scores, and images.
+
+**No local install needed** - every GitHub Actions run already does this
+for you automatically (see workflow step "Export compressed PDF chunks"),
+splitting the report into 5 upload-sized PDFs. Go to that run on the
+**Actions** tab → scroll to **Artifacts** → download
+**`ppc-analyzer-report-exports`** → unzip it. You'll find `report-part1-of-5.pdf`
+through `report-part5-of-5.pdf` (each ~5MB for a 100-page report in testing)
+alongside the full-fidelity `.zip` bundle. Upload the PDF parts to
+ChatGPT/Claude directly - no Node.js, npm, or anything else required on
+your machine.
+
+If you'd rather run it yourself (e.g. against a report you already
+unzipped, or with different settings):
 
 ```bash
 node scripts/export-pdf.js site/report/runs/<runId>/ --out report.pdf
@@ -142,18 +155,18 @@ node scripts/export-pdf.js site/report/runs/<runId>/ --out report.pdf
 
 Works against any report folder containing `index.html` + `screenshots/`
 - a run directory in this repo, or an unzipped `ppc-analyzer-full-report-zip`
-download from a GitHub Actions run. Defaults (`--max-width 800 --quality 70`)
-land around 50MB for a ~100-page report; if that's still too big for your
-target upload limit, push both down:
+download. Defaults (`--max-width 800 --quality 70`) land around 50MB for a
+~100-page report - split it into smaller chunks instead of one huge file:
 
 ```bash
-node scripts/export-pdf.js site/report/runs/<runId>/ --out report.pdf --max-width 350 --quality 40
+node scripts/export-pdf.js site/report/runs/<runId>/ \
+  --chunks 5 --out-prefix report --max-width 400 --quality 45
 ```
 
-That combination produced a 19.5MB PDF from a 104-page/202-screenshot
-report in testing - small enough for typical ChatGPT/Claude upload limits.
-Lower `--max-width` and `--quality` further if you need it smaller still
-(images get blurrier as you push them down).
+That's what the workflow runs by default - 5 files around 5MB each from a
+104-page/202-screenshot report in testing. Push `--max-width`/`--quality`
+down further, or raise `--chunks`, if you need smaller files still (images
+get blurrier as you push those numbers down).
 
 ## Important caveat
 
