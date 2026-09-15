@@ -6,12 +6,13 @@
 // --yes is passed, since it calls the Claude API once per page.
 //
 // Options:
-//   --top N            top/bottom N pages per ranking category (default 5)
-//   --min-sessions N    minimum sessions for reliable conversion-rate ranking (default 100)
-//   --all               run against the full page list instead of just the top/bottom test batch
-//   --yes               skip the cost confirmation prompt before the critique step
-//   --concurrency N     browser capture concurrency (default 2)
-//   --delay N           delay in ms between requests, for both capture and critique (default 1500)
+//   --top N                    top/bottom N pages per ranking category (default 5)
+//   --min-sessions N           minimum sessions for reliable conversion-rate ranking (default 100)
+//   --all                      run against the full page list instead of just the top/bottom test batch
+//   --min-conversion-rate N    run only pages at or above this conversion rate % (overrides --all)
+//   --yes                      skip the cost confirmation prompt before the critique step
+//   --concurrency N            browser capture concurrency (default 2)
+//   --delay N                  delay in ms between requests, for both capture and critique (default 1500)
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -33,6 +34,7 @@ if (!csvPath) {
 const topN = flag("top", "5");
 const minSessions = flag("min-sessions", "100");
 const useAll = has("all");
+const minConversionRate = flag("min-conversion-rate", null);
 const concurrency = flag("concurrency", "2");
 const delay = flag("delay", "1500");
 
@@ -47,12 +49,24 @@ function ask(question) {
 }
 
 async function main() {
-  run("scripts/rank.js", [csvPath, "--top", topN, "--min-sessions", minSessions]);
+  const rankArgs = [csvPath, "--top", topN, "--min-sessions", minSessions];
+  if (minConversionRate !== null) rankArgs.push("--min-conversion-rate", minConversionRate);
+  run("scripts/rank.js", rankArgs);
 
-  const batchInput = useAll ? "raw/pages.json" : "raw/test-batch.json";
-  const batch = JSON.parse(readFileSync("raw/pages.json", "utf-8"));
-  const pageCount = useAll ? batch.pages.length : Math.min(2 * Number(topN), batch.pages.length);
-  console.log(`\nCapture batch: ${useAll ? "ALL pages" : "test batch (top+bottom by conversion rate)"} (~${pageCount} pages)`);
+  let batchInput, scopeLabel, pageCountFallback;
+  if (minConversionRate !== null) {
+    batchInput = "raw/threshold-batch.json";
+    scopeLabel = `pages with >= ${minConversionRate}% conversion rate`;
+  } else if (useAll) {
+    batchInput = "raw/pages.json";
+    scopeLabel = "ALL pages";
+  } else {
+    batchInput = "raw/test-batch.json";
+    scopeLabel = "test batch (top+bottom by conversion rate)";
+  }
+  const batchData = JSON.parse(readFileSync(batchInput, "utf-8"));
+  const pageCount = Array.isArray(batchData) ? batchData.length : batchData.pages.length;
+  console.log(`\nCapture batch: ${scopeLabel} (${pageCount} pages)`);
 
   run("scripts/capture.js", [batchInput, "--concurrency", concurrency, "--delay", delay]);
 

@@ -14,7 +14,11 @@ const topFlagIdx = args.indexOf("--top");
 const topN = topFlagIdx !== -1 ? Number(args[topFlagIdx + 1]) : 5;
 const minFlagIdx = args.indexOf("--min-sessions");
 const minSessions = minFlagIdx !== -1 ? Number(args[minFlagIdx + 1]) : 100;
-const csvArg = args.find((a) => !a.startsWith("--") && a !== String(topN) && a !== String(minSessions));
+const minRateFlagIdx = args.indexOf("--min-conversion-rate");
+const minConversionRate = minRateFlagIdx !== -1 ? Number(args[minRateFlagIdx + 1]) : 0;
+const csvArg = args.find(
+  (a) => !a.startsWith("--") && a !== String(topN) && a !== String(minSessions) && a !== String(minConversionRate)
+);
 const csvPath = csvArg || "data/PPC_Dashboard_Report.csv";
 
 const pages = parsePpcCsv(csvPath);
@@ -51,7 +55,18 @@ writeFileSync(
 );
 console.log(`\nFull parsed + ranked dataset written to raw/pages.json`);
 
-// Suggested test batch: top 5 + bottom 5 by conversion rate (reliable pages only).
-const testBatch = [...byConversionRate.slice(0, 5), ...byConversionRate.slice(-5)];
+// Suggested test batch: top N + bottom N by conversion rate (reliable pages only).
+const testBatch =
+  topN * 2 >= byConversionRate.length
+    ? byConversionRate
+    : [...byConversionRate.slice(0, topN), ...byConversionRate.slice(-topN)];
 writeFileSync(path.join("raw", "test-batch.json"), JSON.stringify(testBatch, null, 2));
-console.log(`Suggested test batch (top 5 + bottom 5, min ${minSessions} sessions) written to raw/test-batch.json`);
+console.log(`Suggested test batch (top ${topN} + bottom ${topN}, min ${minSessions} sessions) written to raw/test-batch.json`);
+
+// Threshold batch: every reliable page at or above a minimum conversion rate,
+// for "analyze everything that's actually converting decently" runs.
+const thresholdBatch = byConversionRate.filter((p) => p.conversionRate >= minConversionRate);
+writeFileSync(path.join("raw", "threshold-batch.json"), JSON.stringify(thresholdBatch, null, 2));
+console.log(
+  `${thresholdBatch.length} pages with >= ${minConversionRate}% conversion rate (and >= ${minSessions} sessions) written to raw/threshold-batch.json`
+);

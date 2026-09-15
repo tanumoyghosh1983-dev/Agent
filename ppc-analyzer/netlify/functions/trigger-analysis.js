@@ -58,7 +58,7 @@ exports.handler = async function (event) {
     return { statusCode: 401, headers, body: JSON.stringify({ error: "Incorrect password" }) };
   }
 
-  const { csvContent, topN, minSessions, scope } = body;
+  const { csvContent, topN, minSessions, scope, minConversionRate } = body;
   if (!csvContent || typeof csvContent !== "string") {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "csvContent is required" }) };
   }
@@ -109,7 +109,8 @@ exports.handler = async function (event) {
             csv_path: "data/PPC_Dashboard_Report.csv",
             top_n: String(topN || 5),
             min_sessions: String(minSessions || 100),
-            scope: scope === "all" ? "all" : "test-batch",
+            scope: ["all", "above-threshold"].includes(scope) ? scope : "test-batch",
+            min_conversion_rate: String(minConversionRate || 1),
           },
         }),
       }

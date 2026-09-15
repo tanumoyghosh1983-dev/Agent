@@ -159,8 +159,11 @@ since every run calls the paid Claude API.
   (update this after re-exporting a fresh CSV and committing it)
 - `top_n` — top/bottom N pages per ranking category (default 5)
 - `min_sessions` — minimum sessions for reliable ranking (default 100)
-- `scope` — `test-batch` (top+bottom N, default) or `all` (every page —
-  more API cost, more runtime)
+- `scope` — `test-batch` (top+bottom N, default), `above-threshold` (every
+  page at or above `min_conversion_rate`), or `all` (every page — more API
+  cost, more runtime)
+- `min_conversion_rate` — only used when `scope=above-threshold`; minimum
+  conversion rate % to include (default 1)
 
 The run uploads `raw/` and `screenshots/` as a downloadable build artifact
 (30-day retention) for manual review, and commits the regenerated

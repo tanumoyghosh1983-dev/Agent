@@ -24,7 +24,12 @@ on:
         type: choice
         options:
           - test-batch
+          - above-threshold
           - all
+      min_conversion_rate:
+        description: "Only used when scope=above-threshold: minimum conversion rate % to include"
+        required: false
+        default: "1"
 
 permissions:
   contents: write
@@ -56,10 +61,13 @@ jobs:
         run: |
           node scripts/rank.js "${{ github.event.inputs.csv_path }}" \
             --top "${{ github.event.inputs.top_n }}" \
-            --min-sessions "${{ github.event.inputs.min_sessions }}"
+            --min-sessions "${{ github.event.inputs.min_sessions }}" \
+            --min-conversion-rate "${{ github.event.inputs.min_conversion_rate }}"
 
           if [ "${{ github.event.inputs.scope }}" = "all" ]; then
             BATCH_INPUT="raw/pages.json"
+          elif [ "${{ github.event.inputs.scope }}" = "above-threshold" ]; then
+            BATCH_INPUT="raw/threshold-batch.json"
           else
             BATCH_INPUT="raw/test-batch.json"
           fi
