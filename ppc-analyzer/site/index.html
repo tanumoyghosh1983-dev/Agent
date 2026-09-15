@@ -91,20 +91,24 @@
 
       <div class="row">
         <div class="field">
-          <label for="topN">Top/bottom N pages</label>
-          <input type="number" id="topN" value="5" min="1" max="50">
-        </div>
-        <div class="field">
-          <label for="minSessions">Min sessions</label>
-          <input type="number" id="minSessions" value="100" min="0">
-        </div>
-        <div class="field">
           <label for="scope">Scope</label>
           <select id="scope">
             <option value="test-batch">Test batch (top+bottom N)</option>
             <option value="above-threshold">Above a conversion rate %</option>
             <option value="all">All pages</option>
           </select>
+        </div>
+        <div class="field">
+          <label for="minSessions">Min sessions</label>
+          <input type="number" id="minSessions" value="100" min="0">
+          <div class="hint">Ignore pages with too little traffic to trust their conversion rate.</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field" id="topNField">
+          <label for="topN">Top/bottom N pages</label>
+          <input type="number" id="topN" value="5" min="1" max="50">
         </div>
         <div class="field" id="minConversionRateField" hidden>
           <label for="minConversionRate">Min conversion rate %</label>
@@ -143,13 +147,17 @@
   const actionsLink = document.getElementById('actionsLink');
   const scopeSelect = document.getElementById('scope');
   const minConversionRateField = document.getElementById('minConversionRateField');
+  const topNField = document.getElementById('topNField');
 
   let selectedFile = null;
   let pollTimer = null;
 
-  scopeSelect.addEventListener('change', () => {
+  function updateScopeFields() {
     minConversionRateField.hidden = scopeSelect.value !== 'above-threshold';
-  });
+    topNField.hidden = scopeSelect.value !== 'test-batch';
+  }
+  scopeSelect.addEventListener('change', updateScopeFields);
+  updateScopeFields();
 
   dropzone.addEventListener('click', () => fileInput.click());
   dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
