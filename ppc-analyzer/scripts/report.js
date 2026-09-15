@@ -10,6 +10,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 function loadJson(p, fallback = null) {
   if (!existsSync(p)) return fallback;
@@ -62,6 +63,20 @@ const EXPORT_COLUMNS = [
   ["desktopScreenshotFile", (r) => r.desktopScreenshot],
   ["mobileScreenshotFile", (r) => r.mobileScreenshot],
 ];
+
+function buildZip(sourceDir, zipDestPath) {
+  try {
+    mkdirSync(path.dirname(zipDestPath), { recursive: true });
+    // Zip the *contents* of sourceDir (via cwd), not the folder itself, so
+    // extracting the archive drops index.html/export.csv/screenshots/
+    // directly where you unzip it - no wrapper folder to dig through.
+    execFileSync("zip", ["-r", "-q", "-X", path.resolve(zipDestPath), "."], { cwd: sourceDir });
+    return true;
+  } catch (err) {
+    console.warn(`Could not create ZIP bundle (is 'zip' installed?): ${err.message}`);
+    return false;
+  }
+}
 
 function buildCsv(merged) {
   const header = EXPORT_COLUMNS.map(([name]) => csvCell(name)).join(",");
@@ -164,9 +179,22 @@ function run() {
   }
 
   const csv = buildCsv(merged);
-  const html = buildHtml(merged, patterns, { runId, historyHref: "../../history.html", csvHref: "export.csv" });
-  writeFileSync(path.join(runDir, "index.html"), html);
   writeFileSync(path.join(runDir, "export.csv"), csv);
+
+  // Zip runDir now (screenshots + CSV) so there's a downloadable, fully
+  // self-contained bundle. The zip lives *next to* runDir, so it's fine
+  // that index.html (written after) isn't inside this snapshot - the
+  // report page you're on already has everything the zip would show you.
+  const zipPath = path.join("site", "report", "runs", `${runId}.zip`);
+  const zipOk = buildZip(runDir, zipPath);
+
+  const html = buildHtml(merged, patterns, {
+    runId,
+    historyHref: "../../history.html",
+    csvHref: "export.csv",
+    zipHref: zipOk ? `../${runId}.zip` : null,
+  });
+  writeFileSync(path.join(runDir, "index.html"), html);
 
   // Update the manifest of all runs (newest first).
   const manifestPath = path.join("site", "report", "manifest.json");
@@ -184,7 +212,12 @@ function run() {
       }
     }
   }
-  const latestHtml = buildHtml(merged, patterns, { runId, historyHref: "history.html", csvHref: "export.csv" });
+  const latestHtml = buildHtml(merged, patterns, {
+    runId,
+    historyHref: "history.html",
+    csvHref: "export.csv",
+    zipHref: zipOk ? `runs/${runId}.zip` : null,
+  });
   writeFileSync("site/report/index.html", latestHtml);
   writeFileSync("site/report/export.csv", csv);
 
@@ -192,6 +225,7 @@ function run() {
 
   console.log(`Report written to site/report/index.html and site/report/runs/${runId}/ (${merged.length} pages)`);
   console.log(`CSV export: site/report/export.csv`);
+  console.log(zipOk ? `ZIP bundle (report + screenshots): site/report/runs/${runId}.zip` : `ZIP bundle skipped (zip command unavailable)`);
   console.log(`History page: site/report/history.html (${manifest.length} runs total)`);
 }
 
@@ -237,7 +271,7 @@ function pageCard(r, rank) {
 </div>`;
 }
 
-function buildHtml(merged, patterns, { runId, historyHref, csvHref } = {}) {
+function buildHtml(merged, patterns, { runId, historyHref, csvHref, zipHref } = {}) {
   const cards = merged.map((r, i) => pageCard(r, i + 1)).join("\n");
   const patternsList = patterns.map((p) => `<li>${escapeHtml(p)}</li>`).join("\n");
 
@@ -281,6 +315,7 @@ function buildHtml(merged, patterns, { runId, historyHref, csvHref } = {}) {
   <p>Generated ${new Date().toISOString()} · ${merged.length} pages · Ranked by Conversion Rate
     ${runId ? ` · Run <code>${escapeHtml(runId)}</code>` : ""}
     ${csvHref ? ` · <a href="${escapeHtml(csvHref)}" download>⬇ Download CSV</a>` : ""}
+    ${zipHref ? ` · <a href="${escapeHtml(zipHref)}" download>⬇ Download full report (HTML + images, .zip)</a>` : ""}
     ${historyHref ? ` · <a href="${escapeHtml(historyHref)}">View all past runs →</a>` : ""}
   </p>
 
@@ -311,7 +346,11 @@ function buildHistoryHtml(manifest) {
     .map((m, i) => {
       const label = i === 0 ? " (latest)" : "";
       const dir = i === 0 ? "" : `runs/${escapeHtml(m.runId)}/`;
-      return `<tr><td>${escapeHtml(m.generatedAt)}${label}</td><td>${m.pageCount} pages</td><td><a href="${dir}index.html">Open report →</a></td><td><a href="${dir}export.csv" download>⬇ CSV</a></td></tr>`;
+      const zipPath = path.join("site", "report", "runs", `${m.runId}.zip`);
+      const zipCell = existsSync(zipPath)
+        ? `<a href="runs/${escapeHtml(m.runId)}.zip" download>⬇ ZIP</a>`
+        : "";
+      return `<tr><td>${escapeHtml(m.generatedAt)}${label}</td><td>${m.pageCount} pages</td><td><a href="${dir}index.html">Open report →</a></td><td><a href="${dir}export.csv" download>⬇ CSV</a></td><td>${zipCell}</td></tr>`;
     })
     .join("\n");
 
@@ -335,8 +374,8 @@ function buildHistoryHtml(manifest) {
   <h1>All Analysis Runs</h1>
   <p><a href="index.html">← Back to latest report</a></p>
   <table>
-    <tr><th>Generated</th><th>Pages</th><th></th><th></th></tr>
-    ${rows || '<tr><td colspan="4">No runs yet.</td></tr>'}
+    <tr><th>Generated</th><th>Pages</th><th></th><th></th><th></th></tr>
+    ${rows || '<tr><td colspan="5">No runs yet.</td></tr>'}
   </table>
 </div>
 </body>
