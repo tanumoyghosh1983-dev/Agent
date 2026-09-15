@@ -1,6 +1,13 @@
 # For a separate Netlify site connected to this repo with
-# Base directory = ppc-analyzer. Publishes the static HTML report only —
-# Netlify never runs the capture/critique pipeline (see README.md).
+# Base directory = ppc-analyzer. Publishes site/ (the upload-and-analyze
+# app plus the generated report at site/report/). Netlify itself never
+# runs the capture/critique pipeline directly — the "Analyze" button
+# calls a Netlify Function that commits the CSV and triggers the GitHub
+# Actions workflow, which does the actual work (see README.md).
 [build]
-  publish = "report"
+  publish = "site"
   command = "true"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"

@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPC Landing Page Analyzer</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; padding: 0 16px 60px; background: #f7f7f8; color: #1a1a1a;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { margin-top: 40px; font-size: 28px; }
+  p.sub { color: #555; margin-top: -8px; }
+  .card {
+    background: #fff; border: 1px solid #ddd; border-radius: 10px;
+    padding: 24px; margin: 20px 0;
+  }
+  label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+  .field { margin-bottom: 18px; }
+  input[type="password"], input[type="number"], select {
+    width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc;
+    border-radius: 6px; font-size: 14px;
+  }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row .field { flex: 1; min-width: 140px; }
+  .dropzone {
+    border: 2px dashed #bbb; border-radius: 8px; padding: 28px; text-align: center;
+    color: #666; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  }
+  .dropzone.dragover { border-color: #4c8bf5; background: #f0f6ff; }
+  .dropzone.has-file { border-color: #2f9e44; background: #f1fbf3; color: #1a1a1a; }
+  button {
+    background: #2b6cb0; color: #fff; border: none; border-radius: 6px;
+    padding: 12px 20px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+  }
+  button:disabled { background: #9ab6d8; cursor: not-allowed; }
+  .hint { font-size: 13px; color: #777; margin-top: 6px; }
+  .status { margin-top: 20px; }
+  .status-line { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 14px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+  .dot.running { background: #f0ad4e; animation: pulse 1.2s infinite; }
+  .dot.done { background: #2f9e44; }
+  .dot.failed { background: #c0392b; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .error { color: #b02a2a; background: #fff0f0; border: 1px solid #f0b8b8; border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 14px; }
+  a.report-link { display: inline-block; margin-top: 14px; font-weight: 600; }
+  .costnote { font-size: 13px; color: #8a6d00; background: #fff8e1; border: 1px solid #f0d878; border-radius: 6px; padding: 10px 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PPC Landing Page Analyzer</h1>
+  <p class="sub">Upload a fresh PPC dashboard CSV export and analyze every page's conversion performance against an AI critique of the live page.</p>
+
+  <div class="card">
+    <form id="analyzeForm">
+      <div class="field">
+        <label for="password">Access password</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+      </div>
+
+      <div class="field">
+        <label>CSV file</label>
+        <div class="dropzone" id="dropzone">
+          <div id="dropzoneText">Drop your CSV here, or click to choose a file</div>
+          <input type="file" id="csvFile" accept=".csv" style="display:none">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="topN">Top/bottom N pages</label>
+          <input type="number" id="topN" value="5" min="1" max="50">
+        </div>
+        <div class="field">
+          <label for="minSessions">Min sessions</label>
+          <input type="number" id="minSessions" value="100" min="0">
+        </div>
+        <div class="field">
+          <label for="scope">Scope</label>
+          <select id="scope">
+            <option value="test-batch">Test batch (top+bottom N)</option>
+            <option value="all">All pages</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="costnote">⚠ Analyzing calls the paid Claude API once per page. Start with the test batch before running "All pages."</div>
+
+      <button type="submit" id="submitBtn">Analyze</button>
+    </form>
+
+    <div class="error" id="errorBox" hidden></div>
+
+    <div class="status" id="statusBox" hidden>
+      <div class="status-line"><span class="dot" id="dot-capture"></span> Ranking CSV &amp; capturing screenshots</div>
+      <div class="status-line"><span class="dot" id="dot-critique"></span> Critiquing pages with Claude</div>
+      <div class="status-line"><span class="dot" id="dot-report"></span> Building report</div>
+      <div id="statusExtra" class="hint"></div>
+      <a class="report-link" id="reportLink" href="report/" hidden>View report →</a>
+      <a class="report-link" id="actionsLink" href="#" target="_blank" hidden>View full run on GitHub →</a>
+    </div>
+  </div>
+
+  <p class="hint">Already have a report? <a href="report/">View the latest report</a>.</p>
+</div>
+
+<script>
+  const form = document.getElementById('analyzeForm');
+  const dropzone = document.getElementById('dropzone');
+  const dropzoneText = document.getElementById('dropzoneText');
+  const fileInput = document.getElementById('csvFile');
+  const submitBtn = document.getElementById('submitBtn');
+  const errorBox = document.getElementById('errorBox');
+  const statusBox = document.getElementById('statusBox');
+  const statusExtra = document.getElementById('statusExtra');
+  const reportLink = document.getElementById('reportLink');
+  const actionsLink = document.getElementById('actionsLink');
+
+  let selectedFile = null;
+  let pollTimer = null;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) setFile(fileInput.files[0]);
+  });
+
+  function setFile(file) {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      showError('Please choose a .csv file.');
+      return;
+    }
+    selectedFile = file;
+    dropzone.classList.add('has-file');
+    dropzoneText.textContent = `Selected: ${file.name}`;
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.hidden = false;
+  }
+  function clearError() {
+    errorBox.hidden = true;
+    errorBox.textContent = '';
+  }
+
+  function setDot(id, state) {
+    const el = document.getElementById(id);
+    el.className = 'dot' + (state ? ' ' + state : '');
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearError();
+    if (pollTimer) clearInterval(pollTimer);
+
+    if (!selectedFile) {
+      showError('Please choose a CSV file first.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Starting...';
+    statusBox.hidden = false;
+    reportLink.hidden = true;
+    actionsLink.hidden = true;
+    setDot('dot-capture', '');
+    setDot('dot-critique', '');
+    setDot('dot-report', '');
+    statusExtra.textContent = '';
+
+    try {
+      const csvContent = await selectedFile.text();
+      const res = await fetch('/.netlify/functions/trigger-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: document.getElementById('password').value,
+          csvContent,
+          topN: document.getElementById('topN').value,
+          minSessions: document.getElementById('minSessions').value,
+          scope: document.getElementById('scope').value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to start analysis.');
+
+      actionsLink.href = data.actionsUrl;
+      actionsLink.hidden = false;
+      statusExtra.textContent = 'Analysis started. This can take several minutes...';
+
+      // Give GitHub a moment to register the new run before polling.
+      setTimeout(() => { pollTimer = setInterval(pollStatus, 6000); pollStatus(); }, 5000);
+    } catch (err) {
+      showError(err.message || String(err));
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Analyze';
+    }
+  });
+
+  async function pollStatus() {
+    try {
+      const res = await fetch('/.netlify/functions/check-status');
+      const data = await res.json();
+      if (!data.found) { statusExtra.textContent = 'Waiting for the run to appear...'; return; }
+
+      const stepNames = (data.steps || []).map((s) => s.name);
+      const stepDone = (needle) => (data.steps || []).some((s) => s.name.includes(needle) && s.conclusion === 'success');
+      const stepFailed = (needle) => (data.steps || []).some((s) => s.name.includes(needle) && s.conclusion === 'failure');
+      const stepRunning = (needle) => (data.steps || []).some((s) => s.name.includes(needle) && s.status === 'in_progress');
+
+      setDot('dot-capture', stepFailed('rank + capture') ? 'failed' : stepDone('rank + capture') ? 'done' : stepRunning('rank + capture') || stepRunning('Install') ? 'running' : '');
+      setDot('dot-critique', stepFailed('critique') ? 'failed' : stepDone('critique') ? 'done' : stepRunning('critique') ? 'running' : '');
+      setDot('dot-report', stepFailed('Build report') ? 'failed' : stepDone('Build report') ? 'done' : stepRunning('Build report') ? 'running' : '');
+
+      if (data.status === 'completed') {
+        clearInterval(pollTimer);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Analyze';
+        if (data.conclusion === 'success') {
+          statusExtra.textContent = 'Done! Report updated.';
+          reportLink.hidden = false;
+        } else {
+          statusExtra.textContent = 'The run finished with a failure — check the GitHub run for details.';
+          setDot('dot-report', 'failed');
+        }
+      } else {
+        statusExtra.textContent = `Run status: ${data.status}...`;
+      }
+    } catch (err) {
+      // Transient poll errors aren't fatal - just try again next tick.
+    }
+  }
+</script>
+</body>
+</html>

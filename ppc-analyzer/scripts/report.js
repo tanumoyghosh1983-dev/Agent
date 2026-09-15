@@ -108,18 +108,18 @@ function run() {
   ];
 
   // --- Copy screenshots into report/ so the HTML is self-contained-ish ---
-  mkdirSync("report/screenshots", { recursive: true });
+  mkdirSync("site/report/screenshots", { recursive: true });
   for (const r of merged) {
     for (const key of ["desktopScreenshot", "mobileScreenshot"]) {
       if (r[key] && existsSync(path.join("screenshots", r[key]))) {
-        copyFileSync(path.join("screenshots", r[key]), path.join("report", "screenshots", r[key]));
+        copyFileSync(path.join("screenshots", r[key]), path.join("site", "report", "screenshots", r[key]));
       }
     }
   }
 
   const html = buildHtml(merged, patterns);
-  writeFileSync("report/index.html", html);
-  console.log(`Report written to report/index.html (${merged.length} pages)`);
+  writeFileSync("site/report/index.html", html);
+  console.log(`Report written to site/report/index.html (${merged.length} pages)`);
 }
 
 function scoreBar(score) {
