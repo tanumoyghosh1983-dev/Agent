@@ -181,22 +181,28 @@ function run() {
   const csv = buildCsv(merged);
   writeFileSync(path.join(runDir, "export.csv"), csv);
 
-  // ZIP bundles duplicate the screenshots a second time (once loose, once
-  // compressed). That's fine for a small test batch but adds up fast at
-  // scale - a 100+ page run can already be several hundred MB of loose
-  // screenshots, so skip the extra copy past this size.
-  const ZIP_MAX_PAGES = 20;
-  const zipPath = path.join("site", "report", "runs", `${runId}.zip`);
-  const zipOk = merged.length <= ZIP_MAX_PAGES ? buildZip(runDir, zipPath) : false;
-  if (merged.length > ZIP_MAX_PAGES) {
-    console.log(`Skipping ZIP bundle: ${merged.length} pages exceeds ${ZIP_MAX_PAGES} (avoids duplicating screenshots again). Browse/download screenshots individually from the report instead.`);
+  // Always build the full ZIP bundle (report + CSV + every screenshot) so
+  // there's always a way to export "everything, exactly as shown" - but a
+  // ZIP duplicates the screenshots a second time (once loose, once
+  // compressed), which adds up fast at scale. So it's only committed to
+  // the live site (permanent, instant download) below this page count;
+  // past that, it's still built and handed to the workflow to upload as a
+  // GitHub Actions artifact instead (30-day download, doesn't bloat the repo).
+  const ZIP_COMMIT_MAX_PAGES = 20;
+  const localZipPath = path.join("dist-exports", `${runId}.zip`);
+  const zipBuilt = buildZip(runDir, localZipPath);
+  const zipCommitted = zipBuilt && merged.length <= ZIP_COMMIT_MAX_PAGES;
+  if (zipCommitted) {
+    mkdirSync(path.join("site", "report", "runs"), { recursive: true });
+    copyFileSync(localZipPath, path.join("site", "report", "runs", `${runId}.zip`));
   }
 
   const html = buildHtml(merged, patterns, {
     runId,
     historyHref: "../../history.html",
     csvHref: "export.csv",
-    zipHref: zipOk ? `../${runId}.zip` : null,
+    zipHref: zipCommitted ? `../${runId}.zip` : null,
+    zipArtifactNote: zipBuilt && !zipCommitted,
   });
   writeFileSync(path.join(runDir, "index.html"), html);
 
@@ -215,7 +221,8 @@ function run() {
     runId,
     historyHref: "history.html",
     csvHref: "export.csv",
-    zipHref: zipOk ? `runs/${runId}.zip` : null,
+    zipHref: zipCommitted ? `runs/${runId}.zip` : null,
+    zipArtifactNote: zipBuilt && !zipCommitted,
     screenshotsBase: `runs/${runId}/screenshots/`,
   });
   writeFileSync("site/report/index.html", latestHtml);
@@ -225,7 +232,13 @@ function run() {
 
   console.log(`Report written to site/report/index.html and site/report/runs/${runId}/ (${merged.length} pages)`);
   console.log(`CSV export: site/report/export.csv`);
-  console.log(zipOk ? `ZIP bundle (report + screenshots): site/report/runs/${runId}.zip` : `ZIP bundle skipped`);
+  if (zipCommitted) {
+    console.log(`ZIP bundle (report + screenshots): site/report/runs/${runId}.zip`);
+  } else if (zipBuilt) {
+    console.log(`ZIP bundle built at ${localZipPath} - too large to commit (${merged.length} > ${ZIP_COMMIT_MAX_PAGES} pages); upload it as a workflow artifact instead.`);
+  } else {
+    console.log(`ZIP bundle skipped (build failed).`);
+  }
   console.log(`History page: site/report/history.html (${manifest.length} runs total)`);
 }
 
@@ -271,7 +284,7 @@ function pageCard(r, rank, screenshotsBase) {
 </div>`;
 }
 
-function buildHtml(merged, patterns, { runId, historyHref, csvHref, zipHref, screenshotsBase = "screenshots/" } = {}) {
+function buildHtml(merged, patterns, { runId, historyHref, csvHref, zipHref, zipArtifactNote, screenshotsBase = "screenshots/" } = {}) {
   const cards = merged.map((r, i) => pageCard(r, i + 1, screenshotsBase)).join("\n");
   const patternsList = patterns.map((p) => `<li>${escapeHtml(p)}</li>`).join("\n");
 
@@ -316,6 +329,7 @@ function buildHtml(merged, patterns, { runId, historyHref, csvHref, zipHref, scr
     ${runId ? ` · Run <code>${escapeHtml(runId)}</code>` : ""}
     ${csvHref ? ` · <a href="${escapeHtml(csvHref)}" download>⬇ Download CSV</a>` : ""}
     ${zipHref ? ` · <a href="${escapeHtml(zipHref)}" download>⬇ Download full report (HTML + images, .zip)</a>` : ""}
+    ${zipArtifactNote ? ` · ⬇ Full ZIP export (too large for the live site) is attached to this run's GitHub Actions job as a downloadable artifact` : ""}
     ${historyHref ? ` · <a href="${escapeHtml(historyHref)}">View all past runs →</a>` : ""}
   </p>
 

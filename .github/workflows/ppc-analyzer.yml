@@ -81,6 +81,14 @@ jobs:
       - name: Build report
         run: node scripts/report.js
 
+      - name: Upload full report bundle (HTML + CSV + all screenshots, .zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppc-analyzer-full-report-zip
+          path: ppc-analyzer/dist-exports/
+          retention-days: 30
+          if-no-files-found: ignore
+
       - name: Upload raw data + screenshots (for manual review)
         uses: actions/upload-artifact@v4
         with:
