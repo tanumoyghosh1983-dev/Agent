@@ -16,8 +16,15 @@ const minFlagIdx = args.indexOf("--min-sessions");
 const minSessions = minFlagIdx !== -1 ? Number(args[minFlagIdx + 1]) : 100;
 const minRateFlagIdx = args.indexOf("--min-conversion-rate");
 const minConversionRate = minRateFlagIdx !== -1 ? Number(args[minRateFlagIdx + 1]) : 0;
+const maxRateFlagIdx = args.indexOf("--max-conversion-rate");
+const maxConversionRate = maxRateFlagIdx !== -1 ? Number(args[maxRateFlagIdx + 1]) : Infinity;
 const csvArg = args.find(
-  (a) => !a.startsWith("--") && a !== String(topN) && a !== String(minSessions) && a !== String(minConversionRate)
+  (a) =>
+    !a.startsWith("--") &&
+    a !== String(topN) &&
+    a !== String(minSessions) &&
+    a !== String(minConversionRate) &&
+    a !== String(maxConversionRate)
 );
 const csvPath = csvArg || "data/PPC_Dashboard_Report.csv";
 
@@ -63,10 +70,15 @@ const testBatch =
 writeFileSync(path.join("raw", "test-batch.json"), JSON.stringify(testBatch, null, 2));
 console.log(`Suggested test batch (top ${topN} + bottom ${topN}, min ${minSessions} sessions) written to raw/test-batch.json`);
 
-// Threshold batch: every reliable page at or above a minimum conversion rate,
-// for "analyze everything that's actually converting decently" runs.
-const thresholdBatch = byConversionRate.filter((p) => p.conversionRate >= minConversionRate);
+// Threshold batch: every reliable page within a conversion-rate range,
+// for "analyze everything that's actually converting decently" runs, or a
+// specific band you haven't analyzed yet (e.g. 2%-3%, having already
+// covered >=3% in an earlier run).
+const thresholdBatch = byConversionRate.filter(
+  (p) => p.conversionRate >= minConversionRate && p.conversionRate <= maxConversionRate
+);
 writeFileSync(path.join("raw", "threshold-batch.json"), JSON.stringify(thresholdBatch, null, 2));
+const rangeLabel = maxConversionRate === Infinity ? `>= ${minConversionRate}%` : `${minConversionRate}%-${maxConversionRate}%`;
 console.log(
-  `${thresholdBatch.length} pages with >= ${minConversionRate}% conversion rate (and >= ${minSessions} sessions) written to raw/threshold-batch.json`
+  `${thresholdBatch.length} pages with ${rangeLabel} conversion rate (and >= ${minSessions} sessions) written to raw/threshold-batch.json`
 );

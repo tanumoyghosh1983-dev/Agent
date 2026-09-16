@@ -10,6 +10,7 @@
 //   --min-sessions N           minimum sessions for reliable conversion-rate ranking (default 100)
 //   --all                      run against the full page list instead of just the top/bottom test batch
 //   --min-conversion-rate N    run only pages at or above this conversion rate % (overrides --all)
+//   --max-conversion-rate N    run only pages at or below this conversion rate % (used with --min-conversion-rate to target a band, e.g. 2%-3%)
 //   --yes                      skip the cost confirmation prompt before the critique step
 //   --concurrency N            browser capture concurrency (default 2)
 //   --delay N                  delay in ms between requests, for both capture and critique (default 1500)
@@ -35,6 +36,7 @@ const topN = flag("top", "5");
 const minSessions = flag("min-sessions", "100");
 const useAll = has("all");
 const minConversionRate = flag("min-conversion-rate", null);
+const maxConversionRate = flag("max-conversion-rate", null);
 const concurrency = flag("concurrency", "2");
 const delay = flag("delay", "1500");
 
@@ -51,12 +53,16 @@ function ask(question) {
 async function main() {
   const rankArgs = [csvPath, "--top", topN, "--min-sessions", minSessions];
   if (minConversionRate !== null) rankArgs.push("--min-conversion-rate", minConversionRate);
+  if (maxConversionRate !== null) rankArgs.push("--max-conversion-rate", maxConversionRate);
   run("scripts/rank.js", rankArgs);
 
   let batchInput, scopeLabel, pageCountFallback;
-  if (minConversionRate !== null) {
+  if (minConversionRate !== null || maxConversionRate !== null) {
     batchInput = "raw/threshold-batch.json";
-    scopeLabel = `pages with >= ${minConversionRate}% conversion rate`;
+    scopeLabel =
+      maxConversionRate !== null
+        ? `pages with ${minConversionRate ?? 0}%-${maxConversionRate}% conversion rate`
+        : `pages with >= ${minConversionRate}% conversion rate`;
   } else if (useAll) {
     batchInput = "raw/pages.json";
     scopeLabel = "ALL pages";

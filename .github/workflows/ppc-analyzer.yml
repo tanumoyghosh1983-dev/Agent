@@ -30,6 +30,10 @@ on:
         description: "Only used when scope=above-threshold: minimum conversion rate % to include"
         required: false
         default: "1"
+      max_conversion_rate:
+        description: "Only used when scope=above-threshold: maximum conversion rate % to include (leave blank for no upper limit)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -59,10 +63,11 @@ jobs:
 
       - name: Run pipeline (rank + capture)
         run: |
-          node scripts/rank.js "${{ github.event.inputs.csv_path }}" \
-            --top "${{ github.event.inputs.top_n }}" \
-            --min-sessions "${{ github.event.inputs.min_sessions }}" \
-            --min-conversion-rate "${{ github.event.inputs.min_conversion_rate }}"
+          RANK_ARGS=(--top "${{ github.event.inputs.top_n }}" --min-sessions "${{ github.event.inputs.min_sessions }}" --min-conversion-rate "${{ github.event.inputs.min_conversion_rate }}")
+          if [ -n "${{ github.event.inputs.max_conversion_rate }}" ]; then
+            RANK_ARGS+=(--max-conversion-rate "${{ github.event.inputs.max_conversion_rate }}")
+          fi
+          node scripts/rank.js "${{ github.event.inputs.csv_path }}" "${RANK_ARGS[@]}"
 
           if [ "${{ github.event.inputs.scope }}" = "all" ]; then
             BATCH_INPUT="raw/pages.json"
