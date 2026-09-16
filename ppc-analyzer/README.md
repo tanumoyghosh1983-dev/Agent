@@ -124,9 +124,25 @@ Fresh CSV export later — just re-run the same command with the new file.
 - `raw/` — full JSON dataset, ranked lists, capture results, per-page
   critiques (raw output for manual review, not just the final report;
   also uploaded as a downloadable build artifact when run via GitHub Actions)
-- `screenshots/` — full-page PNGs, desktop + mobile per page
+- `screenshots/` — full-page PNGs, desktop + mobile per page (used for the
+  Claude critique itself and uploaded to the 30-day GitHub Actions artifact;
+  full resolution)
 - `site/report/index.html` — final ranked report with embedded screenshots,
-  scores, and cross-page pattern observations
+  scores, and cross-page pattern observations. Screenshots committed here
+  are compressed (downscaled + JPEG, ~10-15% of original size) since every
+  run is kept permanently (see "Keeping every run" below) - at real scale
+  (100+ pages) full-resolution PNGs would add up to gigabytes per run.
+
+## Repo size at scale
+
+Every run's screenshots are committed permanently (`site/report/runs/<runId>/`)
+so nothing is ever overwritten. To keep that sustainable, `report.js`
+compresses screenshots before committing them (~1.2MB PNG → ~150KB JPEG,
+about 7-8x smaller) - a 600-page run adds roughly ~150-200MB to the repo
+instead of ~1.4GB. Still meaningful at that scale, but far more
+sustainable across repeated large runs. If you need the true
+full-resolution originals for a specific run, they're in that run's
+30-day GitHub Actions artifact (`ppc-analyzer-raw-output`), not git.
 
 ## Exporting a report as PDF (for uploading to ChatGPT/Claude)
 

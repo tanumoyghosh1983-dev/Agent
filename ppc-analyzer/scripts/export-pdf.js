@@ -124,7 +124,9 @@ async function run() {
   console.log(`Reading report from ${reportDir} ...`);
   let html = readFileSync(path.join(reportDir, "index.html"), "utf-8");
 
-  const refs = [...new Set([...html.matchAll(/screenshots\/([^"]+\.png)/g)].map((m) => m[1]))];
+  // Matches both extensions: newer runs' screenshots are compressed JPEGs
+  // (report.js), older archived runs from before that change are still PNG.
+  const refs = [...new Set([...html.matchAll(/screenshots\/([^"]+\.(?:png|jpe?g))/gi)].map((m) => m[1]))];
   console.log(`Found ${refs.length} screenshot references. Compressing (max-width ${maxWidth}px, JPEG q${quality}) ...`);
 
   const cache = new Map();

@@ -11,6 +11,26 @@
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import sharp from "sharp";
+
+// Screenshots get compressed (downscaled + re-encoded as JPEG) before being
+// committed to the permanent run archive - full-resolution PNGs can be
+// ~1-4MB each, and at real scale (hundreds of pages) that adds up to
+// gigabytes committed to git forever (every run is kept, by design). This
+// cuts each screenshot to roughly 10-15% of its original size while
+// staying perfectly readable in the report. The original full-res PNGs
+// still exist in the raw/screenshots/ used for the Claude critique itself,
+// and in the 30-day GitHub Actions artifact - only the git-committed copy
+// is compressed.
+const SCREENSHOT_MAX_WIDTH = 1000;
+const SCREENSHOT_QUALITY = 75;
+
+async function compressScreenshot(srcPath, destPath) {
+  await sharp(srcPath)
+    .resize({ width: SCREENSHOT_MAX_WIDTH, withoutEnlargement: true })
+    .jpeg({ quality: SCREENSHOT_QUALITY, mozjpeg: true })
+    .toFile(destPath);
+}
 
 function loadJson(p, fallback = null) {
   if (!existsSync(p)) return fallback;
@@ -84,7 +104,7 @@ function buildCsv(merged) {
   return [header, ...rows].join("\n") + "\n";
 }
 
-function run() {
+async function run() {
   const pagesData = loadJson("raw/pages.json");
   const critiques = loadJson("raw/critiques.json", []);
   const captureResults = loadJson("raw/capture-results.json", []);
@@ -172,13 +192,18 @@ function run() {
   mkdirSync("raw", { recursive: true });
   writeFileSync(path.join("raw", "run-id.txt"), runId); // lets other steps (e.g. PDF export) find this run without parsing logs
 
+  let compressCount = 0;
   for (const r of merged) {
     for (const key of ["desktopScreenshot", "mobileScreenshot"]) {
       if (r[key] && existsSync(path.join("screenshots", r[key]))) {
-        copyFileSync(path.join("screenshots", r[key]), path.join(runDir, "screenshots", r[key]));
+        const jpgName = r[key].replace(/\.png$/i, ".jpg");
+        await compressScreenshot(path.join("screenshots", r[key]), path.join(runDir, "screenshots", jpgName));
+        r[key] = jpgName; // buildCsv/buildHtml/buildZip below all read this field, so they pick up the new filename
+        compressCount++;
       }
     }
   }
+  console.log(`Compressed ${compressCount} screenshots into the run archive (max-width ${SCREENSHOT_MAX_WIDTH}px, JPEG q${SCREENSHOT_QUALITY}).`);
 
   const csv = buildCsv(merged);
   writeFileSync(path.join(runDir, "export.csv"), csv);
@@ -398,4 +423,4 @@ function buildHistoryHtml(manifest) {
 </html>`;
 }
 
-run();
+run().catch((err) => { console.error("Report build failed:", err); process.exit(1); });
